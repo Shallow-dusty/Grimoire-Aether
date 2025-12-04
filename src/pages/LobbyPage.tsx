@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { BackgroundEffect } from '../components/ui/layout/BackgroundEffect';
 import { createGameSession, joinGameByCode, addParticipant } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Moon, Users, ArrowRight, Sparkles } from 'lucide-react';
+import { Loader2, Scroll, Skull, Sword, Crown } from 'lucide-react';
 
 export default function LobbyPage() {
     const navigate = useNavigate();
@@ -23,19 +23,12 @@ export default function LobbyPage() {
         setError(null);
 
         try {
-            // 1. 查找房间
             const session = await joinGameByCode(joinCode);
-            if (!session) throw new Error('房间不存在');
-
-            // 2. 加入房间 (作为玩家)
-            // TODO: 获取当前用户 ID (如果已登录)
-            // 这里暂时假设是匿名/临时用户，不绑定 user_id
-            await addParticipant(session.id, username, 999); // 999 表示未分配座位
-
-            // 3. 跳转到游戏页面
+            if (!session) throw new Error('The Grimoire does not answer... (Room not found)');
+            await addParticipant(session.id, username, 999);
             navigate(`/game/${session.id}`);
         } catch (err) {
-            setError(err instanceof Error ? err.message : '加入失败');
+            setError(err instanceof Error ? err.message : 'The ritual failed.');
         } finally {
             setLoading(false);
         }
@@ -48,204 +41,190 @@ export default function LobbyPage() {
         setError(null);
 
         try {
-            // 1. 创建房间 (作为说书人)
-            // TODO: 真正的说书人应该需要登录，这里暂时允许匿名创建用于测试
-            // 实际生产中应该检查 user_id
-            const userId = 'temp-storyteller-id'; // 临时 ID
-            const session = await createGameSession(userId, roomName || `${username}的魔典`);
-
-            // 2. 跳转到游戏页面
+            const userId = 'temp-storyteller-id';
+            const session = await createGameSession(userId, roomName || `${username}'s Grimoire`);
             navigate(`/game/${session.id}?role=storyteller`);
         } catch (err) {
-            setError(err instanceof Error ? err.message : '创建失败');
+            setError(err instanceof Error ? err.message : 'The spell fizzled.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="relative min-h-screen flex items-center justify-center font-sans text-slate-200">
+        <div className="relative min-h-screen flex items-center justify-center font-sans text-parchment-200 overflow-hidden">
             <BackgroundEffect />
 
+            {/* 魔法书容器 */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="relative z-10 w-full max-w-md p-6"
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 1, ease: "easeOut" }}
+                className="relative z-10 w-full max-w-lg p-12"
             >
-                {/* 标题区域 */}
-                <div className="text-center mb-8">
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: 0.2, duration: 0.8 }}
-                        className="inline-block mb-4"
-                    >
-                        <div className="w-16 h-16 mx-auto bg-gradient-to-tr from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30 rotate-3">
-                            <Moon className="w-8 h-8 text-white" />
-                        </div>
-                    </motion.div>
-                    <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-slate-400 font-serif">
-                        Grimoire Aether
-                    </h1>
-                    <p className="mt-2 text-slate-400 text-sm tracking-wide uppercase">
-                        血染钟楼 · 沉浸式魔典
-                    </p>
+                {/* 书本背景纹理 */}
+                <div className="absolute inset-0 bg-parchment-400 rounded-sm shadow-[0_0_50px_rgba(0,0,0,0.8)] transform rotate-1">
+                    {/* 纹理叠加 */}
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/aged-paper.png')] opacity-50 mix-blend-multiply"></div>
+                    {/* 边缘磨损效果 */}
+                    <div className="absolute inset-0 border-[12px] border-double border-gold-700/30 rounded-sm"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/10 via-transparent to-black/30"></div>
                 </div>
 
-                {/* 主卡片 */}
-                <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
-                    {/* 选项卡切换 */}
-                    <div className="flex border-b border-white/5">
+                {/* 内容区域 */}
+                <div className="relative z-20 text-charcoal-900">
+                    {/* 标题 */}
+                    <div className="text-center mb-10">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.5, duration: 1 }}
+                            className="flex justify-center mb-4"
+                        >
+                            <Crown className="w-12 h-12 text-blood-900 drop-shadow-sm" strokeWidth={1.5} />
+                        </motion.div>
+                        <h1 className="text-5xl font-serif font-bold text-blood-900 tracking-widest drop-shadow-sm mb-2">
+                            Grimoire Aether
+                        </h1>
+                        <div className="h-px w-32 mx-auto bg-blood-900/50 my-4"></div>
+                        <p className="text-charcoal-800 font-serif italic text-sm tracking-widest uppercase">
+                            Where Lies and Logic Entwine
+                        </p>
+                    </div>
+
+                    {/* 模式切换 (墨水标签) */}
+                    <div className="flex justify-center gap-8 mb-8 font-serif text-lg border-b border-charcoal-900/20 pb-2">
                         <button
                             onClick={() => setMode('join')}
-                            className={`flex-1 py-4 text-sm font-medium transition-colors relative ${mode === 'join' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
+                            className={`relative px-4 py-2 transition-all duration-300 ${mode === 'join'
+                                    ? 'text-blood-900 font-bold scale-110'
+                                    : 'text-charcoal-600 hover:text-blood-700'
                                 }`}
                         >
-                            加入房间
+                            <span className="flex items-center gap-2">
+                                <Sword className="w-4 h-4" /> Join Ritual
+                            </span>
                             {mode === 'join' && (
-                                <motion.div
-                                    layoutId="activeTab"
-                                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500"
-                                />
+                                <motion.div layoutId="underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blood-900" />
                             )}
                         </button>
                         <button
                             onClick={() => setMode('create')}
-                            className={`flex-1 py-4 text-sm font-medium transition-colors relative ${mode === 'create' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
+                            className={`relative px-4 py-2 transition-all duration-300 ${mode === 'create'
+                                    ? 'text-blood-900 font-bold scale-110'
+                                    : 'text-charcoal-600 hover:text-blood-700'
                                 }`}
                         >
-                            创建魔典
+                            <span className="flex items-center gap-2">
+                                <Scroll className="w-4 h-4" /> Open Grimoire
+                            </span>
                             {mode === 'create' && (
-                                <motion.div
-                                    layoutId="activeTab"
-                                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500"
-                                />
+                                <motion.div layoutId="underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blood-900" />
                             )}
                         </button>
                     </div>
 
-                    {/* 表单区域 */}
-                    <div className="p-6 min-h-[300px]">
-                        <AnimatePresence mode="wait">
-                            {mode === 'join' ? (
-                                <motion.form
-                                    key="join"
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: 20 }}
-                                    transition={{ duration: 0.2 }}
-                                    onSubmit={handleJoin}
-                                    className="space-y-4"
-                                >
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">你的名字</label>
-                                        <div className="relative group">
-                                            <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-purple-400 transition-colors" />
-                                            <input
-                                                type="text"
-                                                value={username}
-                                                onChange={(e) => setUsername(e.target.value)}
-                                                placeholder="输入昵称..."
-                                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">房间代码</label>
-                                        <div className="relative group">
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-slate-500 font-mono text-xs border border-slate-600 rounded group-focus-within:border-purple-400 group-focus-within:text-purple-400 transition-colors">#</div>
-                                            <input
-                                                type="text"
-                                                value={joinCode}
-                                                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                                                placeholder="例如: AB12"
-                                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all font-mono uppercase tracking-widest"
-                                                maxLength={4}
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-4">
-                                        <button
-                                            type="submit"
-                                            disabled={loading}
-                                            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium py-3 rounded-xl shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>进入房间 <ArrowRight className="w-4 h-4" /></>}
-                                        </button>
-                                    </div>
-                                </motion.form>
-                            ) : (
-                                <motion.form
-                                    key="create"
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
-                                    transition={{ duration: 0.2 }}
-                                    onSubmit={handleCreate}
-                                    className="space-y-4"
-                                >
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">说书人昵称</label>
-                                        <div className="relative group">
-                                            <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-amber-400 transition-colors" />
-                                            <input
-                                                type="text"
-                                                value={username}
-                                                onChange={(e) => setUsername(e.target.value)}
-                                                placeholder="你的名字..."
-                                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">房间名称 (可选)</label>
-                                        <input
-                                            type="text"
-                                            value={roomName}
-                                            onChange={(e) => setRoomName(e.target.value)}
-                                            placeholder={`${username || '我'}的魔典`}
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all"
-                                        />
-                                    </div>
-
-                                    <div className="pt-4">
-                                        <button
-                                            type="submit"
-                                            disabled={loading}
-                                            className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium py-3 rounded-xl shadow-lg shadow-amber-900/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>创建魔典 <Sparkles className="w-4 h-4" /></>}
-                                        </button>
-                                    </div>
-                                </motion.form>
-                            )}
-                        </AnimatePresence>
-
-                        {error && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center"
+                    {/* 表单 */}
+                    <AnimatePresence mode="wait">
+                        {mode === 'join' ? (
+                            <motion.form
+                                key="join"
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 10 }}
+                                onSubmit={handleJoin}
+                                className="space-y-6 px-4"
                             >
-                                {error}
-                            </motion.div>
-                        )}
-                    </div>
-                </div>
+                                <div className="group">
+                                    <label className="block font-serif text-blood-900 text-sm mb-1">Your True Name</label>
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        className="w-full bg-transparent border-b-2 border-charcoal-400 text-charcoal-900 font-serif text-xl py-2 focus:outline-none focus:border-blood-700 transition-colors placeholder:text-charcoal-400/50"
+                                        placeholder="Enter name..."
+                                        required
+                                    />
+                                </div>
+                                <div className="group">
+                                    <label className="block font-serif text-blood-900 text-sm mb-1">Grimoire Code</label>
+                                    <input
+                                        type="text"
+                                        value={joinCode}
+                                        onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                                        className="w-full bg-transparent border-b-2 border-charcoal-400 text-charcoal-900 font-serif text-xl py-2 focus:outline-none focus:border-blood-700 transition-colors placeholder:text-charcoal-400/50 uppercase tracking-[0.2em]"
+                                        placeholder="ABCD"
+                                        maxLength={4}
+                                        required
+                                    />
+                                </div>
 
-                {/* 底部信息 */}
-                <div className="mt-8 text-center text-slate-500 text-xs">
-                    <p>Powered by DeepSeek AI & Supabase Realtime</p>
-                    <p className="mt-1">© 2025 Antigravity Team</p>
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full mt-8 bg-blood-900 text-parchment-200 font-serif font-bold py-3 px-6 rounded-sm shadow-md hover:bg-blood-800 hover:shadow-lg active:translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gold-600"
+                                >
+                                    {loading ? <Loader2 className="animate-spin" /> : 'Enter the Circle'}
+                                </button>
+                            </motion.form>
+                        ) : (
+                            <motion.form
+                                key="create"
+                                initial={{ opacity: 0, x: 10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -10 }}
+                                onSubmit={handleCreate}
+                                className="space-y-6 px-4"
+                            >
+                                <div className="group">
+                                    <label className="block font-serif text-blood-900 text-sm mb-1">Storyteller Name</label>
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        className="w-full bg-transparent border-b-2 border-charcoal-400 text-charcoal-900 font-serif text-xl py-2 focus:outline-none focus:border-blood-700 transition-colors placeholder:text-charcoal-400/50"
+                                        placeholder="Enter name..."
+                                        required
+                                    />
+                                </div>
+                                <div className="group">
+                                    <label className="block font-serif text-blood-900 text-sm mb-1">Chronicle Title</label>
+                                    <input
+                                        type="text"
+                                        value={roomName}
+                                        onChange={(e) => setRoomName(e.target.value)}
+                                        className="w-full bg-transparent border-b-2 border-charcoal-400 text-charcoal-900 font-serif text-xl py-2 focus:outline-none focus:border-blood-700 transition-colors placeholder:text-charcoal-400/50"
+                                        placeholder="The Village of..."
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full mt-8 bg-blood-900 text-parchment-200 font-serif font-bold py-3 px-6 rounded-sm shadow-md hover:bg-blood-800 hover:shadow-lg active:translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gold-600"
+                                >
+                                    {loading ? <Loader2 className="animate-spin" /> : 'Awaken the Demon'}
+                                </button>
+                            </motion.form>
+                        )}
+                    </AnimatePresence>
+
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-6 text-center text-blood-700 font-serif text-sm flex items-center justify-center gap-2"
+                        >
+                            <Skull className="w-4 h-4" /> {error}
+                        </motion.div>
+                    )}
                 </div>
             </motion.div>
+
+            {/* 底部版权 */}
+            <div className="absolute bottom-4 text-parchment-400/50 text-xs font-serif tracking-widest mix-blend-overlay">
+                FORGED IN THE AETHER • MMXXV
+            </div>
         </div>
     );
 }
