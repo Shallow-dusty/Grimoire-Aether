@@ -8,6 +8,7 @@ interface SeatingChartProps {
     height: number;
     onPlayerSelect: (playerId: string) => void;
     selectedPlayerId: string | null;
+    role?: 'storyteller' | 'player';
 }
 
 export function SeatingChart({
@@ -15,7 +16,8 @@ export function SeatingChart({
     width,
     height,
     onPlayerSelect,
-    selectedPlayerId
+    selectedPlayerId,
+    role = 'player'
 }: SeatingChartProps) {
     // 计算布局参数
     const centerX = width / 2;
@@ -72,6 +74,9 @@ export function SeatingChart({
                         seatIndex={player.seat_index}
                         isDead={player.is_dead}
                         isSelected={selectedPlayerId === player.id}
+                        role={role}
+                        // TODO: 从数据库获取真实角色名
+                        characterName={player.character_id || undefined} 
                         onClick={() => onPlayerSelect(player.id)}
                     />
                 );

@@ -94,6 +94,7 @@ export default function GrimoirePage() {
                         selectedPlayerId={selectedPlayerId}
                         width={window.innerWidth}
                         height={window.innerHeight}
+                        role={role}
                     />
                 </StageWrapper>
             </div>
