@@ -1,17 +1,24 @@
 /**
- * AI 客户端 - 与后端 AI 网关通信
+ * AI 客户端 - 2025年12月 最新版
  * 
- * 重要：此文件不包含任何 API 密钥
- * 所有敏感信息都在服务器端处理
+ * 支持提供商：
+ * - DeepSeek（V3.2 / R1）
+ * - Kimi（K2 Thinking）
+ * - SiliconFlow（硅基流动）
+ * - OpenRouter
+ * - OpenAI（o1 / o3-mini）
+ * - Anthropic（Claude Sonnet 4）
  */
 
-// 消息类型
+// ============================================================
+// 类型
+// ============================================================
+
 export interface ChatMessage {
     role: 'system' | 'user' | 'assistant';
     content: string;
 }
 
-// AI 响应类型
 export interface ChatResponse {
     id: string;
     object: string;
@@ -29,136 +36,70 @@ export interface ChatResponse {
     };
 }
 
-// 错误响应类型
-export interface AIError {
-    error: string;
-    message?: string;
-    status?: number;
-}
+export type AIProvider =
+    | 'deepseek'
+    | 'kimi'
+    | 'siliconflow'
+    | 'openrouter'
+    | 'openai'
+    | 'anthropic';
 
-// 聊天请求参数
-export interface ChatRequest {
-    messages: ChatMessage[];
+export interface ChatOptions {
     model?: string;
+    provider?: AIProvider;
     temperature?: number;
     max_tokens?: number;
     stream?: boolean;
 }
 
-/**
- * 发送消息到 AI
- * 
- * @param messages - 消息历史数组
- * @param options - 可选配置
- * @returns AI 响应
- * 
- * @example
- * ```ts
- * const response = await sendMessageToAI([
- *   { role: 'user', content: 'Hello!' }
- * ]);
- * console.log(response.choices[0].message.content);
- * ```
- */
-export async function sendMessageToAI(
+// ============================================================
+// API
+// ============================================================
+
+export async function sendMessage(
     messages: ChatMessage[],
-    options?: Partial<Omit<ChatRequest, 'messages'>>
+    options?: ChatOptions
 ): Promise<ChatResponse> {
     const response = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            messages,
-            ...options
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, ...options })
     });
 
     const data = await response.json();
-
-    if (!response.ok) {
-        throw new AIClientError(
-            data.message || data.error || 'Unknown error',
-            response.status,
-            data
-        );
-    }
-
-    return data as ChatResponse;
+    if (!response.ok) throw new AIClientError(data.message || data.error, response.status, data);
+    return data;
 }
 
-/**
- * 发送简单文本消息
- * 
- * @param content - 用户消息内容
- * @param systemPrompt - 可选的系统提示
- * @returns AI 回复的文本
- * 
- * @example
- * ```ts
- * const reply = await chat('你好！');
- * console.log(reply); // "你好！有什么可以帮助你的吗？"
- * ```
- */
 export async function chat(
     content: string,
-    systemPrompt?: string
+    options?: ChatOptions & { systemPrompt?: string }
 ): Promise<string> {
     const messages: ChatMessage[] = [];
-
-    if (systemPrompt) {
-        messages.push({ role: 'system', content: systemPrompt });
-    }
-
+    if (options?.systemPrompt) messages.push({ role: 'system', content: options.systemPrompt });
     messages.push({ role: 'user', content });
 
-    const response = await sendMessageToAI(messages);
+    const response = await sendMessage(messages, options);
     return response.choices[0]?.message?.content || '';
 }
 
-/**
- * 检查 AI 服务健康状态
- * 
- * @returns 健康检查结果
- */
-export async function checkAIHealth(): Promise<{
-    status: string;
-    timestamp: string;
-    hasApiKey: boolean;
-}> {
+export async function checkHealth() {
     const response = await fetch('/api/health');
-
-    if (!response.ok) {
-        throw new AIClientError('Health check failed', response.status);
-    }
-
+    if (!response.ok) throw new AIClientError('Health check failed', response.status);
     return response.json();
 }
 
-/**
- * 获取可用模型列表
- */
-export async function getAvailableModels(): Promise<{
-    data: Array<{ id: string; object: string }>;
-}> {
-    const response = await fetch('/api/ai/models');
-
-    if (!response.ok) {
-        throw new AIClientError('Failed to fetch models', response.status);
-    }
-
+export async function getProviders() {
+    const response = await fetch('/api/ai/providers');
+    if (!response.ok) throw new AIClientError('Failed to fetch', response.status);
     return response.json();
 }
 
-/**
- * AI 客户端错误类
- */
 export class AIClientError extends Error {
     public status: number;
-    public data?: AIError;
+    public data?: unknown;
 
-    constructor(message: string, status: number, data?: AIError) {
+    constructor(message: string, status: number, data?: unknown) {
         super(message);
         this.name = 'AIClientError';
         this.status = status;
@@ -166,64 +107,142 @@ export class AIClientError extends Error {
     }
 }
 
-/**
- * 创建带有上下文的聊天会话
- * 
- * @param systemPrompt - 系统提示词
- * @returns 会话对象
- * 
- * @example
- * ```ts
- * const session = createChatSession('你是一个游戏助手。');
- * const reply1 = await session.send('游戏规则是什么？');
- * const reply2 = await session.send('如何获胜？');
- * session.clear(); // 清除历史
- * ```
- */
-export function createChatSession(systemPrompt?: string) {
-    const history: ChatMessage[] = [];
+// ============================================================
+// 会话
+// ============================================================
 
-    if (systemPrompt) {
-        history.push({ role: 'system', content: systemPrompt });
+export function createSession(options?: {
+    systemPrompt?: string;
+    provider?: AIProvider;
+    model?: string;
+}) {
+    const history: ChatMessage[] = [];
+    const opts: ChatOptions = { provider: options?.provider, model: options?.model };
+
+    if (options?.systemPrompt) {
+        history.push({ role: 'system', content: options.systemPrompt });
     }
 
     return {
-        /**
-         * 发送消息并获取回复
-         */
         async send(content: string): Promise<string> {
             history.push({ role: 'user', content });
-
-            const response = await sendMessageToAI(history);
+            const response = await sendMessage(history, opts);
             const reply = response.choices[0]?.message?.content || '';
-
             history.push({ role: 'assistant', content: reply });
-
             return reply;
         },
-
-        /**
-         * 获取当前历史记录
-         */
-        getHistory(): ChatMessage[] {
-            return [...history];
-        },
-
-        /**
-         * 清除历史记录
-         */
-        clear(): void {
+        getHistory: () => [...history],
+        clear() {
             history.length = 0;
-            if (systemPrompt) {
-                history.push({ role: 'system', content: systemPrompt });
-            }
+            if (options?.systemPrompt) history.push({ role: 'system', content: options.systemPrompt });
         },
-
-        /**
-         * 添加消息到历史（不发送）
-         */
-        addMessage(message: ChatMessage): void {
-            history.push(message);
-        }
+        setProvider(p: AIProvider) { opts.provider = p; },
+        setModel(m: string) { opts.model = m; }
     };
 }
+
+// ============================================================
+// 提供商快捷方式 - 2025年12月最新模型
+// ============================================================
+
+/** DeepSeek - V3.2 / R1 */
+export const deepseek = {
+    chat: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'deepseek', systemPrompt }),
+
+    reasoner: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'deepseek', model: 'deepseek-reasoner', systemPrompt }),
+
+    session: (systemPrompt?: string) =>
+        createSession({ provider: 'deepseek', systemPrompt }),
+
+    models: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'] as const
+};
+
+/** Kimi - K2 Thinking (256k 上下文) */
+export const kimi = {
+    chat: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'kimi', model: 'kimi-k2-thinking', systemPrompt }),
+
+    fast: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'kimi', model: 'moonshot-v1-8k', systemPrompt }),
+
+    session: (systemPrompt?: string) =>
+        createSession({ provider: 'kimi', model: 'kimi-k2-thinking', systemPrompt }),
+
+    models: ['kimi-k2-thinking', 'moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k'] as const
+};
+
+/** 硅基流动 - 多模型聚合 */
+export const siliconflow = {
+    chat: (content: string, model: string, systemPrompt?: string) =>
+        chat(content, { provider: 'siliconflow', model, systemPrompt }),
+
+    deepseek: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'siliconflow', model: 'deepseek-ai/DeepSeek-V3', systemPrompt }),
+
+    qwen: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'siliconflow', model: 'Qwen/Qwen2.5-72B-Instruct', systemPrompt }),
+
+    free: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'siliconflow', model: 'Pro/Qwen/Qwen2.5-7B-Instruct', systemPrompt }),
+
+    session: (model: string, systemPrompt?: string) =>
+        createSession({ provider: 'siliconflow', model, systemPrompt }),
+
+    models: [
+        'deepseek-ai/DeepSeek-V3',
+        'deepseek-ai/DeepSeek-R1',
+        'Qwen/Qwen2.5-72B-Instruct',
+        'Qwen/QwQ-32B',
+        'Pro/Qwen/Qwen2.5-7B-Instruct'
+    ] as const
+};
+
+/** OpenRouter */
+export const openrouter = {
+    chat: (content: string, model: string, systemPrompt?: string) =>
+        chat(content, { provider: 'openrouter', model, systemPrompt }),
+
+    session: (model: string, systemPrompt?: string) =>
+        createSession({ provider: 'openrouter', model, systemPrompt }),
+
+    models: [
+        'anthropic/claude-3.5-sonnet',
+        'openai/gpt-4o',
+        'openai/o1',
+        'google/gemini-2.0-flash',
+        'deepseek/deepseek-r1'
+    ] as const
+};
+
+/** OpenAI - GPT-4o / o1 / o3-mini */
+export const openai = {
+    chat: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'openai', model: 'gpt-4o', systemPrompt }),
+
+    o1: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'openai', model: 'o1', systemPrompt }),
+
+    o3mini: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'openai', model: 'o3-mini', systemPrompt }),
+
+    session: (model = 'gpt-4o', systemPrompt?: string) =>
+        createSession({ provider: 'openai', model, systemPrompt }),
+
+    models: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini', 'o3-mini'] as const
+};
+
+/** Anthropic - Claude Sonnet 4 */
+export const anthropic = {
+    chat: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'anthropic', model: 'claude-sonnet-4-20250514', systemPrompt }),
+
+    sonnet35: (content: string, systemPrompt?: string) =>
+        chat(content, { provider: 'anthropic', model: 'claude-3-5-sonnet-latest', systemPrompt }),
+
+    session: (model = 'claude-sonnet-4-20250514', systemPrompt?: string) =>
+        createSession({ provider: 'anthropic', model, systemPrompt }),
+
+    models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'] as const
+};
