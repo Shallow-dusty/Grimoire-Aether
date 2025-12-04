@@ -37,7 +37,7 @@ export function BackgroundEffect() {
             </motion.div>
 
             {/* 2. 魔法阵 (The Arcane Layer) - 确保在背景之上，粒子之下 */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-60 mix-blend-screen">
+            <div className="absolute inset-0 flex items-center justify-center opacity-80">
                 <MagicCircle />
             </div>
 
@@ -54,7 +54,7 @@ export function BackgroundEffect() {
             {init && (
                 <Particles
                     id="tsparticles"
-                    className="absolute inset-0 mix-blend-screen"
+                    className="absolute inset-0"
                     options={{
                         fpsLimit: 60,
                         particles: {

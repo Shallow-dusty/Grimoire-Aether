@@ -94,18 +94,18 @@ export default function LobbyPage() {
                 <motion.h1 
                     className={`text-5xl md:text-6xl font-bold tracking-[0.2em] mb-2 text-transparent bg-clip-text bg-linear-to-b transition-all duration-700 ${
                         isStoryteller 
-                            ? 'from-red-400 via-red-600 to-red-900 drop-shadow-[0_0_25px_rgba(220,38,38,0.4)]' 
-                            : 'from-amber-200 via-amber-400 to-amber-700 drop-shadow-[0_0_25px_rgba(251,191,36,0.4)]'
+                            ? 'from-red-400 via-red-600 to-red-900 drop-shadow-[0_0_35px_rgba(220,38,38,0.6)]' 
+                            : 'from-amber-200 via-amber-400 to-amber-700 drop-shadow-[0_0_35px_rgba(251,191,36,0.6)]'
                     }`}
                 >
-                    GRIMOIRE
+                    GRIMOIRE AETHER
                 </motion.h1>
                 <motion.h2
-                    className={`text-2xl md:text-3xl font-light tracking-[0.5em] mb-8 text-stone-400 uppercase transition-colors duration-700 ${
+                    className={`text-xl md:text-2xl font-serif tracking-[0.5em] mb-8 uppercase transition-colors duration-700 ${
                         isStoryteller ? 'text-red-900/80' : 'text-stone-500'
                     }`}
                 >
-                    AETHER
+                    禁忌仪式 · 魔典界面
                 </motion.h2>
 
                 {/* 分隔符 */}
@@ -116,21 +116,21 @@ export default function LobbyPage() {
                 </div>
 
                 {/* 身份切换 (极简文本按钮) */}
-                <div className="flex gap-12 mb-12 text-sm tracking-[0.2em] font-bold">
+                <div className="flex gap-12 mb-12 text-sm tracking-[0.2em] font-bold font-serif">
                     <button
                         onClick={() => setIsStoryteller(false)}
-                        className={`transition-all duration-500 relative group ${!isStoryteller ? 'text-amber-400 scale-110' : 'text-stone-600 hover:text-stone-400'}`}
+                        className={`transition-all duration-500 relative group ${!isStoryteller ? 'text-amber-400 scale-110 drop-shadow-[0_0_10px_rgba(245,158,11,0.8)]' : 'text-stone-600 hover:text-stone-400'}`}
                     >
-                        <span className="relative z-10">PLAYER</span>
+                        <span className="relative z-10">玩家 (PLAYER)</span>
                         {!isStoryteller && (
                             <motion.div layoutId="activeTab" className="absolute -bottom-2 left-0 right-0 h-px bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.8)]" />
                         )}
                     </button>
                     <button
                         onClick={() => setIsStoryteller(true)}
-                        className={`transition-all duration-500 relative group ${isStoryteller ? 'text-red-500 scale-110' : 'text-stone-600 hover:text-stone-400'}`}
+                        className={`transition-all duration-500 relative group ${isStoryteller ? 'text-red-500 scale-110 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)]' : 'text-stone-600 hover:text-stone-400'}`}
                     >
-                        <span className="relative z-10">STORYTELLER</span>
+                        <span className="relative z-10">说书人 (STORYTELLER)</span>
                         {isStoryteller && (
                             <motion.div layoutId="activeTab" className="absolute -bottom-2 left-0 right-0 h-px bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
                         )}
@@ -140,19 +140,19 @@ export default function LobbyPage() {
                 {/* 4. 输入区域 (Floating Underlines) */}
                 <form onSubmit={handleSubmit} className="w-full space-y-12">
                     <div className="group relative w-full">
-                        <label className={`block text-[10px] tracking-[0.3em] uppercase mb-2 transition-colors duration-500 ${isStoryteller ? 'text-red-400/60' : 'text-amber-500/60'}`}>
-                            {isStoryteller ? 'Your True Name' : 'Identity'}
+                        <label className={`block text-[10px] tracking-[0.3em] uppercase mb-2 transition-colors duration-500 font-serif ${isStoryteller ? 'text-red-400/80' : 'text-amber-500/80'}`}>
+                            {isStoryteller ? '尊名 (YOUR NAME)' : '你的名字 (IDENTITY)'}
                         </label>
                         <input
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            className={`w-full bg-transparent border-b py-2 text-center text-2xl font-cinzel focus:outline-none transition-all duration-500 placeholder:text-white/5 ${
+                            className={`w-full bg-transparent border-b py-2 text-center text-2xl font-serif focus:outline-none transition-all duration-500 placeholder:text-white/10 ${
                                 isStoryteller 
-                                    ? 'border-red-900/30 focus:border-red-500 text-red-100' 
-                                    : 'border-white/10 focus:border-amber-500 text-amber-50'
+                                    ? 'border-red-900/50 focus:border-red-500 text-red-100 drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]' 
+                                    : 'border-white/20 focus:border-amber-500 text-amber-50 drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]'
                             }`}
-                            placeholder="Enter Name"
+                            placeholder="输入名字..."
                             autoComplete="off"
                         />
                     </div>
@@ -166,15 +166,15 @@ export default function LobbyPage() {
                                 exit={{ opacity: 0, height: 0 }}
                                 className="group relative w-full"
                             >
-                                <label className="block text-[10px] tracking-[0.3em] uppercase mb-2 text-red-400/60">
-                                    Chronicle Title
+                                <label className="block text-[10px] tracking-[0.3em] uppercase mb-2 text-red-400/80 font-serif">
+                                    剧本标题 (CHRONICLE)
                                 </label>
                                 <input
                                     type="text"
                                     value={roomName}
                                     onChange={(e) => setRoomName(e.target.value)}
-                                    className="w-full bg-transparent border-b border-red-900/30 py-2 text-center text-2xl font-cinzel text-red-100 focus:outline-none focus:border-red-500 transition-all duration-500 placeholder:text-white/5"
-                                    placeholder="Optional"
+                                    className="w-full bg-transparent border-b border-red-900/50 py-2 text-center text-2xl font-serif text-red-100 focus:outline-none focus:border-red-500 transition-all duration-500 placeholder:text-white/10 drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]"
+                                    placeholder="可选..."
                                     autoComplete="off"
                                 />
                             </motion.div>
@@ -186,14 +186,14 @@ export default function LobbyPage() {
                                 exit={{ opacity: 0, height: 0 }}
                                 className="group relative w-full"
                             >
-                                <label className="block text-[10px] tracking-[0.3em] uppercase mb-2 text-amber-500/60">
-                                    Grimoire Code
+                                <label className="block text-[10px] tracking-[0.3em] uppercase mb-2 text-amber-500/80 font-serif">
+                                    房间代码 (CODE)
                                 </label>
                                 <input
                                     type="text"
                                     value={joinCode}
                                     onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                                    className="w-full bg-transparent border-b border-white/10 py-2 text-center text-2xl font-cinzel text-amber-50 focus:outline-none focus:border-amber-500 transition-all duration-500 placeholder:text-white/5 uppercase tracking-[0.2em]"
+                                    className="w-full bg-transparent border-b border-white/20 py-2 text-center text-2xl font-serif text-amber-50 focus:outline-none focus:border-amber-500 transition-all duration-500 placeholder:text-white/10 uppercase tracking-[0.2em] drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]"
                                     placeholder="XXXX"
                                     maxLength={4}
                                     autoComplete="off"
@@ -214,11 +214,11 @@ export default function LobbyPage() {
                                 : 'bg-linear-to-r from-stone-900 to-black border-stone-800/50 text-amber-50 hover:shadow-[0_0_40px_rgba(245,158,11,0.2)]'
                         }`}
                     >
-                        <span className="relative z-10 text-sm tracking-[0.4em] font-bold flex items-center justify-center gap-4">
+                        <span className="relative z-10 text-sm tracking-[0.4em] font-bold flex items-center justify-center gap-4 font-serif">
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                                 <>
                                     <span className={`h-px w-8 ${isStoryteller ? 'bg-red-500' : 'bg-amber-500'} transition-all group-hover:w-12`} />
-                                    {isStoryteller ? 'AWAKEN EVIL' : 'ENTER THE VOID'}
+                                    {isStoryteller ? '唤醒恶魔 (AWAKEN)' : '进入虚空 (ENTER)'}
                                     <span className={`h-px w-8 ${isStoryteller ? 'bg-red-500' : 'bg-amber-500'} transition-all group-hover:w-12`} />
                                 </>
                             )}
