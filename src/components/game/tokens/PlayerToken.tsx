@@ -11,6 +11,13 @@ interface PlayerTokenProps {
     role?: 'storyteller' | 'player'; // 当前用户的角色
     characterName?: string; // 玩家的实际角色（仅说书人可见）
     onClick: () => void;
+    draggable?: boolean;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onDragStart?: (e: any) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onDragEnd?: (e: any) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onContextMenu?: (e: any) => void;
 }
 
 export function PlayerToken({
@@ -21,7 +28,11 @@ export function PlayerToken({
     isSelected,
     role = 'player',
     characterName,
-    onClick
+    onClick,
+    draggable,
+    onDragStart,
+    onDragEnd,
+    onContextMenu
 }: PlayerTokenProps) {
     // 颜色定义
     const colors = {
@@ -38,7 +49,16 @@ export function PlayerToken({
     const initial = name.charAt(0).toUpperCase();
 
     return (
-        <Group x={x} y={y} onClick={onClick} onTap={onClick}>
+        <Group 
+            x={x} 
+            y={y} 
+            onClick={onClick} 
+            onTap={onClick}
+            draggable={draggable}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onContextMenu={onContextMenu}
+        >
             {/* 选中光晕 */}
             {isSelected && (
                 <Circle
