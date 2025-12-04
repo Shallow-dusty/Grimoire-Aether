@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:wrangler": "wrangler pages dev --compatibility-date=2024-01-01 -- npm run dev",
+    "dev:wrangler": "wrangler pages dev dist --live-reload --compatibility-date=2024-01-01",
+    "dev:full": "npm run build && npm run dev:wrangler",
     "build": "vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
