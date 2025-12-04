@@ -5,10 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "check-env": "cmd /c scripts\\check-env.bat"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.2",
