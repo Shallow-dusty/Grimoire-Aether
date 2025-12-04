@@ -55,7 +55,7 @@ function generateJoinCode(): string {
 }
 
 /** 创建游戏房间 */
-export async function createGameSession(storytellerId: string, name?: string) {
+export async function createGameSession(storytellerId: string | null, name?: string) {
   const joinCode = generateJoinCode();
 
   const { data, error } = await supabase

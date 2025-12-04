@@ -17,7 +17,7 @@ export function BackgroundEffect() {
     }, []);
 
     return (
-        <div className="fixed inset-0 -z-10 overflow-hidden bg-black">
+        <div className="fixed inset-0 -z-10 overflow-hidden bg-stone-950">
             {/* 1. 静态背景图 + Ken Burns 动画 */}
             <motion.div
                 className="absolute inset-0 bg-cover bg-center opacity-60"
@@ -36,7 +36,7 @@ export function BackgroundEffect() {
             </motion.div>
 
             {/* 2. 氛围遮罩 (The Abyss) - 压暗背景，但不要太黑 */}
-            <div className="absolute inset-0 bg-linear-to-b from-black/40 via-black/20 to-black/80" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/80" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#000000_120%)] opacity-80" />
 
             {/* 3. 魔法阵 (The Arcane Layer) - 混合模式 Screen 让它发光 */}

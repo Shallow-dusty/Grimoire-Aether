@@ -39,8 +39,8 @@ export default function LobbyPage() {
 
         try {
             if (isStoryteller) {
-                const userId = 'temp-storyteller-id';
-                const session = await createGameSession(userId, roomName || `${username}的魔典`);
+                // 传入 null 作为 storytellerId，因为我们没有 Auth
+                const session = await createGameSession(null, roomName || `${username}的魔典`);
                 navigate(`/game/${session.id}?role=storyteller`);
             } else {
                 const session = await joinGameByCode(joinCode);
@@ -54,8 +54,6 @@ export default function LobbyPage() {
             setLoading(false);
         }
     };
-
-
 
     return (
         <div 
@@ -92,7 +90,7 @@ export default function LobbyPage() {
 
                 {/* 3. 标题 (Typography) */}
                 <motion.h1 
-                    className={`text-5xl md:text-6xl font-bold tracking-[0.2em] mb-2 text-transparent bg-clip-text bg-linear-to-b transition-all duration-700 ${
+                    className={`text-5xl md:text-6xl font-bold tracking-[0.2em] mb-2 text-transparent bg-clip-text bg-gradient-to-b transition-all duration-700 ${
                         isStoryteller 
                             ? 'from-red-400 via-red-600 to-red-900 drop-shadow-[0_0_35px_rgba(220,38,38,0.6)]' 
                             : 'from-amber-200 via-amber-400 to-amber-700 drop-shadow-[0_0_35px_rgba(251,191,36,0.6)]'
@@ -110,9 +108,9 @@ export default function LobbyPage() {
 
                 {/* 分隔符 */}
                 <div className="flex items-center justify-center gap-4 w-full mb-12 opacity-50">
-                    <div className={`h-px flex-1 bg-linear-to-r from-transparent ${isStoryteller ? 'to-red-900' : 'to-amber-900'}`} />
+                    <div className={`h-px flex-1 bg-gradient-to-r from-transparent ${isStoryteller ? 'to-red-900' : 'to-amber-900'}`} />
                     <div className={`text-xs transform rotate-45 w-2 h-2 border ${isStoryteller ? 'border-red-800 bg-red-950' : 'border-amber-800 bg-amber-950'}`} />
-                    <div className={`h-px flex-1 bg-linear-to-l from-transparent ${isStoryteller ? 'to-red-900' : 'to-amber-900'}`} />
+                    <div className={`h-px flex-1 bg-gradient-to-l from-transparent ${isStoryteller ? 'to-red-900' : 'to-amber-900'}`} />
                 </div>
 
                 {/* 身份切换 (极简文本按钮) */}
@@ -210,8 +208,8 @@ export default function LobbyPage() {
                         whileTap={{ scale: 0.95 }}
                         className={`w-full py-5 mt-8 border transition-all duration-500 group relative overflow-hidden ${
                             isStoryteller
-                                ? 'bg-linear-to-r from-red-950 to-black border-red-900/50 text-red-100 hover:shadow-[0_0_40px_rgba(220,38,38,0.4)]'
-                                : 'bg-linear-to-r from-stone-900 to-black border-stone-800/50 text-amber-50 hover:shadow-[0_0_40px_rgba(245,158,11,0.2)]'
+                                ? 'bg-gradient-to-r from-red-950 to-black border-red-900/50 text-red-100 hover:shadow-[0_0_40px_rgba(220,38,38,0.4)]'
+                                : 'bg-gradient-to-r from-stone-900 to-black border-stone-800/50 text-amber-50 hover:shadow-[0_0_40px_rgba(245,158,11,0.2)]'
                         }`}
                     >
                         <span className="relative z-10 text-sm tracking-[0.4em] font-bold flex items-center justify-center gap-4 font-serif">
@@ -225,7 +223,7 @@ export default function LobbyPage() {
                         </span>
                         
                         {/* 按钮内部流光 */}
-                        <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500 bg-linear-to-r ${isStoryteller ? 'from-red-600 via-transparent to-red-600' : 'from-amber-500 via-transparent to-amber-500'}`} />
+                        <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500 bg-gradient-to-r ${isStoryteller ? 'from-red-600 via-transparent to-red-600' : 'from-amber-500 via-transparent to-amber-500'}`} />
                     </motion.button>
                 </form>
 

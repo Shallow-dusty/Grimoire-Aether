@@ -138,7 +138,7 @@ export default function GrimoirePage() {
             {/* 顶部 HUD */}
             <div className="absolute top-0 left-0 right-0 z-20 p-6 flex justify-between items-start pointer-events-none">
                 <div className="flex flex-col gap-1 pointer-events-auto">
-                    <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-linear-to-r from-amber-200 to-amber-600 drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]">
+                    <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-600 drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]">
                         {session.name || '未命名魔典'}
                     </h1>
                     <div className="flex items-center gap-4 text-xs tracking-[0.2em] text-stone-400 uppercase">
