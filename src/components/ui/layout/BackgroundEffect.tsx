@@ -35,9 +35,9 @@ export function BackgroundEffect() {
                 />
             </motion.div>
 
-            {/* 红色氛围光 */}
-            <div className="absolute inset-0 bg-gradient-to-b from-blood-950/40 via-transparent to-blood-950/80 mix-blend-multiply" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)]" />
+            {/* 红色氛围光 - 加深 */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.9)_100%)]" />
 
             {/* 噪点纹理 (增加古老感) */}
             <div className="absolute inset-0 opacity-[0.08] pointer-events-none mix-blend-overlay"
