@@ -5,7 +5,7 @@ export function MagicCircle() {
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
             {/* 外圈符文 */}
             <motion.div
-                className="w-[800px] h-[800px] border border-white/5 rounded-full flex items-center justify-center opacity-20"
+                className="w-[800px] h-[800px] border border-white/10 rounded-full flex items-center justify-center opacity-40"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
             >

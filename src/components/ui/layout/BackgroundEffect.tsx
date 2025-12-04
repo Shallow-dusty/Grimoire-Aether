@@ -38,7 +38,7 @@ export function BackgroundEffect() {
             {/* 魔法阵层 */}
             <MagicCircle />
 
-            {/* 氛围遮罩 (使用新的 Tailwind v4 语法) */}
+            {/* 氛围遮罩 (修复语法) */}
             <div className="absolute inset-0 bg-linear-to-b from-black/80 via-black/60 to-black/90" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.95)_100%)]" />
 

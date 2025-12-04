@@ -55,6 +55,18 @@
   --color-charcoal-950: #0f0f0f;
 }
 
+:root {
+  /* 字体 Fallback */
+  --font-serif: 'Cinzel', 'Noto Serif SC', serif;
+  --font-sans: 'Inter', 'Noto Serif SC', sans-serif;
+  --font-display: 'MedievalSharp', cursive;
+
+  /* 核心颜色 Fallback */
+  --color-blood-500: #ef4444;
+  --color-blood-900: #4a0404;
+  --color-amber-500: #f59e0b;
+}
+
 body {
   margin: 0;
   padding: 0;

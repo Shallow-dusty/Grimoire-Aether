@@ -29,8 +29,8 @@ export default function LobbyPage() {
     const mouseX = useMotionValue(0);
     const mouseY = useMotionValue(0);
 
-    const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [2, -2]), { stiffness: 100, damping: 30 });
-    const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-2, 2]), { stiffness: 100, damping: 30 });
+    const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [3, -3]), { stiffness: 100, damping: 30 });
+    const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-3, 3]), { stiffness: 100, damping: 30 });
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (!containerRef.current) return;
@@ -92,25 +92,25 @@ export default function LobbyPage() {
                 className="relative z-10 w-full max-w-[500px]"
             >
                 {/* 流光边框容器 */}
-                <div className={`relative p-[1px] rounded-sm overflow-hidden transition-all duration-500 ${isStoryteller ? 'shadow-[0_0_80px_rgba(153,27,27,0.4)]' : 'shadow-[0_0_80px_rgba(0,0,0,0.8)]'}`}>
+                <div className={`relative p-px rounded-sm overflow-hidden transition-all duration-500 ${isStoryteller ? 'shadow-[0_0_80px_rgba(153,27,27,0.4)]' : 'shadow-[0_0_80px_rgba(0,0,0,0.8)]'}`}>
                     {/* 动态流光背景 */}
                     <div className={`absolute inset-0 bg-linear-to-br transition-colors duration-1000 ${
                         isStoryteller 
-                            ? 'from-red-900/50 via-black to-red-900/50' 
-                            : 'from-amber-500/20 via-black to-amber-500/20'
+                            ? 'from-red-900 via-black to-red-900' 
+                            : 'from-amber-500 via-black to-amber-500'
                     }`} />
                     
-                    {/* 内部卡片 */}
-                    <div className="relative bg-black/80 backdrop-blur-2xl p-12 rounded-sm overflow-hidden">
+                    {/* 内部卡片 (增加通透感) */}
+                    <div className="relative bg-black/60 backdrop-blur-xl p-12 rounded-sm overflow-hidden border border-white/5">
                         
                         {/* 内部光效 */}
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-linear-to-b from-white/5 to-transparent opacity-50 pointer-events-none" />
                         
                         {/* 角落装饰 */}
-                        <CornerDecor className={`absolute top-3 left-3 text-amber-500/40 transition-colors duration-500 ${isStoryteller ? 'text-red-500/40' : ''}`} />
-                        <CornerDecor className={`absolute top-3 right-3 rotate-90 text-amber-500/40 transition-colors duration-500 ${isStoryteller ? 'text-red-500/40' : ''}`} />
-                        <CornerDecor className={`absolute bottom-3 left-3 -rotate-90 text-amber-500/40 transition-colors duration-500 ${isStoryteller ? 'text-red-500/40' : ''}`} />
-                        <CornerDecor className={`absolute bottom-3 right-3 rotate-180 text-amber-500/40 transition-colors duration-500 ${isStoryteller ? 'text-red-500/40' : ''}`} />
+                        <CornerDecor className={`absolute top-3 left-3 text-amber-500/60 transition-colors duration-500 ${isStoryteller ? 'text-red-500/60' : ''}`} />
+                        <CornerDecor className={`absolute top-3 right-3 rotate-90 text-amber-500/60 transition-colors duration-500 ${isStoryteller ? 'text-red-500/60' : ''}`} />
+                        <CornerDecor className={`absolute bottom-3 left-3 -rotate-90 text-amber-500/60 transition-colors duration-500 ${isStoryteller ? 'text-red-500/60' : ''}`} />
+                        <CornerDecor className={`absolute bottom-3 right-3 rotate-180 text-amber-500/60 transition-colors duration-500 ${isStoryteller ? 'text-red-500/60' : ''}`} />
 
                         {/* 标题区域 */}
                         <div className="text-center mb-12 relative transform translate-z-10">
@@ -147,12 +147,12 @@ export default function LobbyPage() {
 
                         {/* 身份切换 */}
                         <div className="flex justify-center mb-12 transform translate-z-5">
-                            <div className="flex bg-black/40 rounded-full p-1 border border-white/5 shadow-inner backdrop-blur-sm">
+                            <div className="flex bg-black/40 rounded-full p-1 border border-white/10 shadow-inner backdrop-blur-sm">
                                 <button
                                     onClick={() => setIsStoryteller(false)}
                                     className={`px-8 py-2.5 rounded-full text-xs font-bold tracking-widest transition-all duration-500 flex items-center gap-2 font-serif ${
                                         !isStoryteller 
-                                            ? 'bg-linear-to-b from-stone-700 to-stone-800 text-amber-100 shadow-lg border border-white/10 scale-105' 
+                                            ? 'bg-linear-to-b from-stone-700 to-stone-800 text-amber-100 shadow-lg border border-white/20 scale-105' 
                                             : 'text-stone-500 hover:text-stone-300'
                                     }`}
                                 >
@@ -180,7 +180,7 @@ export default function LobbyPage() {
                                         type="text"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value)}
-                                        className="peer w-full bg-transparent border-b border-white/10 py-3 text-amber-50 font-serif text-xl placeholder-transparent focus:outline-none focus:border-amber-500/50 transition-all"
+                                        className="peer w-full bg-transparent border-b border-white/20 py-3 text-amber-50 font-serif text-xl placeholder-transparent focus:outline-none focus:border-amber-500/50 transition-all"
                                         placeholder="Name"
                                         id="username"
                                         required
@@ -209,7 +209,7 @@ export default function LobbyPage() {
                                                 type="text"
                                                 value={roomName}
                                                 onChange={(e) => setRoomName(e.target.value)}
-                                                className="peer w-full bg-transparent border-b border-white/10 py-3 text-amber-50 font-serif text-xl placeholder-transparent focus:outline-none focus:border-amber-500/50 transition-all"
+                                                className="peer w-full bg-transparent border-b border-white/20 py-3 text-amber-50 font-serif text-xl placeholder-transparent focus:outline-none focus:border-amber-500/50 transition-all"
                                                 placeholder="Chronicle"
                                                 id="roomName"
                                                 autoComplete="off"
@@ -234,7 +234,7 @@ export default function LobbyPage() {
                                                 type="text"
                                                 value={joinCode}
                                                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                                                className="peer w-full bg-transparent border-b border-white/10 py-3 text-amber-50 font-serif text-xl placeholder-transparent focus:outline-none focus:border-amber-500/50 transition-all uppercase tracking-[0.2em]"
+                                                className="peer w-full bg-transparent border-b border-white/20 py-3 text-amber-50 font-serif text-xl placeholder-transparent focus:outline-none focus:border-amber-500/50 transition-all uppercase tracking-[0.2em]"
                                                 placeholder="Code"
                                                 id="joinCode"
                                                 maxLength={4}
