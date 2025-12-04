@@ -37,7 +37,7 @@ export default function GrimoirePage() {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center text-red-500 font-cinzel">
                 <Skull className="w-6 h-6 mr-2" />
-                {error || '魔典未响应'}
+                {error instanceof Error ? error.message : error || '魔典未响应'}
             </div>
         );
     }
@@ -89,6 +89,16 @@ export default function GrimoirePage() {
         if (!player) return;
 
         try {
+            // 解析当前状态
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const currentFlags = (player.status_flags as any) || {
+                poisoned: false,
+                drunk: false,
+                protected: false,
+                mad: false,
+                custom: []
+            };
+
             switch (action) {
                 case 'kill':
                     await updateParticipant(player.id, { is_dead: true });
@@ -96,7 +106,21 @@ export default function GrimoirePage() {
                 case 'revive':
                     await updateParticipant(player.id, { is_dead: false });
                     break;
-                // TODO: 处理状态标记 (poison, drunk, protect)
+                case 'poison':
+                    await updateParticipant(player.id, { 
+                        status_flags: { ...currentFlags, poisoned: !currentFlags.poisoned } 
+                    });
+                    break;
+                case 'drunk':
+                    await updateParticipant(player.id, { 
+                        status_flags: { ...currentFlags, drunk: !currentFlags.drunk } 
+                    });
+                    break;
+                case 'protect':
+                    await updateParticipant(player.id, { 
+                        status_flags: { ...currentFlags, protected: !currentFlags.protected } 
+                    });
+                    break;
                 default:
                     console.log('Action not implemented yet:', action);
             }

@@ -76,12 +76,14 @@ export function SeatingChart({
                         x={x}
                         y={y}
                         name={player.name}
-                        seatIndex={player.seat_index}
                         isDead={player.is_dead}
                         isSelected={selectedPlayerId === player.id}
                         role={role}
                         // TODO: 从数据库获取真实角色名
-                        characterName={player.character_id || undefined} 
+                        characterName={player.character_id || undefined}
+                        // 传递状态标记
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        statusFlags={player.status_flags as any}
                         onClick={() => onPlayerSelect(player.id)}
                         
                         // 拖拽逻辑 (仅说书人)

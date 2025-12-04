@@ -1,15 +1,16 @@
 import { Group, Circle, Text, Path } from 'react-konva';
 import { Html } from 'react-konva-utils';
+import type { StatusFlags } from '../../../types/database';
 
 interface PlayerTokenProps {
     x: number;
     y: number;
     name: string;
-    seatIndex: number;
     isDead: boolean;
     isSelected: boolean;
     role?: 'storyteller' | 'player'; // 当前用户的角色
     characterName?: string; // 玩家的实际角色（仅说书人可见）
+    statusFlags?: StatusFlags; // 状态标记
     onClick: () => void;
     draggable?: boolean;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -28,6 +29,7 @@ export function PlayerToken({
     isSelected,
     role = 'player',
     characterName,
+    statusFlags,
     onClick,
     draggable,
     onDragStart,
@@ -137,6 +139,18 @@ export function PlayerToken({
                     fill="#000"
                     opacity={0.4}
                 />
+            )}
+
+            {/* 状态图标 (仅说书人可见，或者根据规则可见) */}
+            {/* 这里简化为都可见，实际逻辑可调整 */}
+            {statusFlags?.poisoned && (
+                <Circle x={-20} y={-20} radius={8} fill="#a855f7" stroke="#fff" strokeWidth={1} />
+            )}
+            {statusFlags?.drunk && (
+                <Circle x={20} y={-20} radius={8} fill="#f59e0b" stroke="#fff" strokeWidth={1} />
+            )}
+            {statusFlags?.protected && (
+                <Circle x={0} y={-32} radius={6} fill="#3b82f6" stroke="#fff" strokeWidth={1} />
             )}
 
             {/* 外部 HTML 文本 (名字) */}
