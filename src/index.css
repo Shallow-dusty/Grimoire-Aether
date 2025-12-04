@@ -2,8 +2,8 @@
 
 @theme {
   /* 字体 */
-  --font-serif: 'Cinzel', serif;
-  --font-sans: 'Inter', sans-serif;
+  --font-serif: 'Cinzel', 'Noto Serif SC', serif;
+  --font-sans: 'Inter', 'Noto Serif SC', sans-serif;
   --font-display: 'MedievalSharp', cursive;
 
   /* 血色 (Blood) */
