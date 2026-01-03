@@ -11,6 +11,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { updateParticipant, supabase } from '../lib/supabase';
 import { ArcaneMenu } from '../components/game/ui/ArcaneMenu';
 import { PhaseIndicator } from '../components/ui/layout/PhaseIndicator';
+import { RoleAssignment } from '../components/game/phases/RoleAssignment';
+import { randomAssignRoles, balancedAssignRoles } from '../utils/roleAssignment';
 
 export default function GrimoirePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
@@ -100,6 +102,48 @@ export default function GrimoirePage() {
         y: number;
         targetId: string | null;
     }>({ visible: false, x: 0, y: 0, targetId: null });
+
+    // 角色分配模态框
+    const [showRoleAssignment, setShowRoleAssignment] = useState(false);
+
+    // 处理角色分配
+    const handleAssignRole = async (playerId: string, characterId: string) => {
+        if (role !== 'storyteller') return;
+
+        try {
+            // 发送状态机事件
+            send({ type: 'ASSIGN_ROLE', playerId, characterId });
+
+            // 同步到数据库
+            await updateParticipant(playerId, { character_id: characterId });
+        } catch (err) {
+            console.error('Failed to assign role:', err);
+        }
+    };
+
+    // 随机分配角色
+    const handleRandomAssign = async () => {
+        if (role !== 'storyteller') return;
+
+        const playerIds = participants.map(p => p.id);
+        const assignments = randomAssignRoles(playerIds);
+
+        for (const [playerId, characterId] of Object.entries(assignments)) {
+            await handleAssignRole(playerId, characterId);
+        }
+    };
+
+    // 平衡分配角色
+    const handleBalancedAssign = async () => {
+        if (role !== 'storyteller') return;
+
+        const playerIds = participants.map(p => p.id);
+        const assignments = balancedAssignRoles(playerIds);
+
+        for (const [playerId, characterId] of Object.entries(assignments)) {
+            await handleAssignRole(playerId, characterId);
+        }
+    };
 
     if (loading) {
         return (
@@ -243,6 +287,16 @@ export default function GrimoirePage() {
                         currentDay={state.context.currentDay}
                         currentNight={state.context.currentNight}
                     />
+
+                    {/* 说书人：Setup 阶段显示分配按钮 */}
+                    {role === 'storyteller' && state.matches('setup') && (
+                        <button
+                            onClick={() => setShowRoleAssignment(true)}
+                            className="mt-4 px-6 py-3 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 rounded-xl text-amber-300 font-medium transition-all hover:scale-105"
+                        >
+                            分配角色
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -301,6 +355,23 @@ export default function GrimoirePage() {
                             </div>
                         </div>
                     </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* 角色分配模态框 */}
+            <AnimatePresence>
+                {showRoleAssignment && role === 'storyteller' && (
+                    <RoleAssignment
+                        players={participants.map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            characterId: p.character_id
+                        }))}
+                        onAssignRole={handleAssignRole}
+                        onRandomAssign={handleRandomAssign}
+                        onBalancedAssign={handleBalancedAssign}
+                        onClose={() => setShowRoleAssignment(false)}
+                    />
                 )}
             </AnimatePresence>
         </div>
