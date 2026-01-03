@@ -1,21 +1,97 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { useMachine } from '@xstate/react';
 import { useGameSession } from '../hooks/useSupabase';
+import { gameMachine, type GameMachineEvent } from '../logic/machines/gameMachine';
 import { StageWrapper } from '../components/game/StageWrapper';
 import { SeatingChart } from '../components/game/board/SeatingChart';
 import { BackgroundEffect } from '../components/ui/layout/BackgroundEffect';
 import { Loader2, Moon, Sun, Shield, Sword, Skull, Crown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { updateParticipant } from '../lib/supabase';
+import { updateParticipant, supabase } from '../lib/supabase';
 import { ArcaneMenu } from '../components/game/ui/ArcaneMenu';
+import { PhaseIndicator } from '../components/ui/layout/PhaseIndicator';
 
 export default function GrimoirePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
     const [searchParams] = useSearchParams();
     const role = searchParams.get('role') === 'storyteller' ? 'storyteller' : 'player';
-    
+
     const { session, participants, loading, error } = useGameSession(sessionId!);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+
+    // XState 游戏状态机 (仅说书人激活)
+    const [state, send] = useMachine(gameMachine, {
+        context: {
+            sessionId: sessionId || '',
+            players: participants.map(p => ({
+                id: p.id,
+                name: p.name,
+                seatIndex: p.seat_index,
+                characterId: p.character_id || null,
+                isDead: p.is_dead,
+                isGhost: p.is_dead, // 死亡的玩家成为幽灵
+                hasUsedGhostVote: false, // 初始未使用幽灵投票
+                statusFlags: {
+                    poisoned: (p.status_flags as any)?.poisoned || false,
+                    drunk: (p.status_flags as any)?.drunk || false,
+                    protected: (p.status_flags as any)?.protected || false,
+                    mad: (p.status_flags as any)?.mad || false,
+                    custom: (p.status_flags as any)?.custom || []
+                }
+            })),
+            currentDay: session?.current_day || 0,
+            currentNight: session?.current_night || 0,
+            isFirstNight: (session?.current_night || 0) === 0,
+            history: [],
+            nightQueue: null,
+            currentNomineeId: null,
+            currentNominatorId: null,
+            currentVotes: {},
+            nominatedToday: [],
+            nominatorsToday: [],
+            executionTarget: null,
+            highestVoteCount: 0,
+            executedToday: false,
+            nominationHistory: [],
+            winner: null,
+            endReason: null
+        }
+    });
+
+    // 同步状态机变化到 Supabase (仅说书人)
+    useEffect(() => {
+        if (role !== 'storyteller' || !sessionId) return;
+
+        const syncToSupabase = async () => {
+            try {
+                // 同步核心状态
+                await supabase
+                    .from('game_sessions')
+                    .update({
+                        phase: state.matches('gameLoop.night') ? 'night' : 'day',
+                        current_day: state.context.currentDay,
+                        current_night: state.context.currentNight,
+                        // 存储完整状态机上下文 (调试用)
+                        metadata: {
+                            ...session?.metadata,
+                            machine_state: state.value,
+                            machine_context: {
+                                executedToday: state.context.executedToday,
+                                executionTarget: state.context.executionTarget,
+                                winner: state.context.winner,
+                                endReason: state.context.endReason
+                            }
+                        }
+                    })
+                    .eq('id', sessionId);
+            } catch (err) {
+                console.error('Failed to sync state to Supabase:', err);
+            }
+        };
+
+        syncToSupabase();
+    }, [state, role, sessionId, session?.metadata]);
 
     // 右键菜单状态
     const [menuState, setMenuState] = useState<{
@@ -41,8 +117,6 @@ export default function GrimoirePage() {
             </div>
         );
     }
-
-    const PhaseIcon = session.phase === 'night' ? Moon : Sun;
 
     // 处理座位变更
     const handleSeatChange = async (playerId: string, newSeatIndex: number) => {
@@ -82,7 +156,7 @@ export default function GrimoirePage() {
         });
     };
 
-    // 处理菜单操作
+    // 处理菜单操作 (说书人通过状态机)
     const handleMenuAction = async (action: string) => {
         if (!menuState.targetId) return;
         const player = participants.find(p => p.id === menuState.targetId);
@@ -101,24 +175,33 @@ export default function GrimoirePage() {
 
             switch (action) {
                 case 'kill':
+                    // 发送状态机事件 (说书人)
+                    if (role === 'storyteller') {
+                        send({ type: 'KILL_PLAYER', playerId: player.id, cause: '说书人击杀' });
+                    }
+                    // 同步到数据库
                     await updateParticipant(player.id, { is_dead: true });
                     break;
                 case 'revive':
+                    // 发送状态机事件
+                    if (role === 'storyteller') {
+                        send({ type: 'REVIVE_PLAYER', playerId: player.id });
+                    }
                     await updateParticipant(player.id, { is_dead: false });
                     break;
                 case 'poison':
-                    await updateParticipant(player.id, { 
-                        status_flags: { ...currentFlags, poisoned: !currentFlags.poisoned } 
+                    await updateParticipant(player.id, {
+                        status_flags: { ...currentFlags, poisoned: !currentFlags.poisoned }
                     });
                     break;
                 case 'drunk':
-                    await updateParticipant(player.id, { 
-                        status_flags: { ...currentFlags, drunk: !currentFlags.drunk } 
+                    await updateParticipant(player.id, {
+                        status_flags: { ...currentFlags, drunk: !currentFlags.drunk }
                     });
                     break;
                 case 'protect':
-                    await updateParticipant(player.id, { 
-                        status_flags: { ...currentFlags, protected: !currentFlags.protected } 
+                    await updateParticipant(player.id, {
+                        status_flags: { ...currentFlags, protected: !currentFlags.protected }
                     });
                     break;
                 default:
@@ -155,12 +238,11 @@ export default function GrimoirePage() {
 
                 {/* 阶段指示器 */}
                 <div className="pointer-events-auto">
-                    <div className="relative flex items-center justify-center w-20 h-20 bg-black/40 backdrop-blur-md rounded-full border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-                        <PhaseIcon className={`w-10 h-10 ${session.phase === 'night' ? 'text-blue-200 drop-shadow-[0_0_10px_rgba(191,219,254,0.5)]' : 'text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]'}`} />
-                        <div className="absolute -bottom-8 text-[10px] tracking-[0.3em] uppercase text-stone-500">
-                            第 {session.current_day} 天
-                        </div>
-                    </div>
+                    <PhaseIndicator
+                        machineState={state}
+                        currentDay={state.context.currentDay}
+                        currentNight={state.context.currentNight}
+                    />
                 </div>
             </div>
 

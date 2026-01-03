@@ -47,6 +47,17 @@ export interface UIState {
   // 夜晚行动追踪
   currentNightActorIndex: number;
   nightActorsOrder: PlayerId[];
+
+  // 角色分配模式
+  assignmentMode: boolean; // 是否处于角色分配模式
+  draggedCharacterId: string | null; // 拖拽的角色 ID
+
+  // 夜晚行动进度
+  nightActionInProgress: boolean; // 是否正在执行夜晚行动
+
+  // 投票追踪
+  votesCollected: Record<PlayerId, boolean>; // 记录已收集的投票
+  showVoteResults: boolean; // 是否显示投票结果
 }
 
 export type ModalType =
@@ -115,6 +126,18 @@ export interface UIActions {
   prevNightActor: () => void;
   resetNightActors: () => void;
 
+  // 角色分配
+  setAssignmentMode: (active: boolean) => void;
+  setDraggedCharacter: (characterId: string | null) => void;
+
+  // 夜晚行动进度
+  setNightActionInProgress: (inProgress: boolean) => void;
+
+  // 投票
+  setVote: (playerId: PlayerId, voted: boolean) => void;
+  clearVotes: () => void;
+  setShowVoteResults: (show: boolean) => void;
+
   // 重置
   reset: () => void;
 }
@@ -140,7 +163,12 @@ const initialState: UIState = {
   zoom: 1,
   panOffset: { x: 0, y: 0 },
   currentNightActorIndex: 0,
-  nightActorsOrder: []
+  nightActorsOrder: [],
+  assignmentMode: false,
+  draggedCharacterId: null,
+  nightActionInProgress: false,
+  votesCollected: {},
+  showVoteResults: false
 };
 
 // ============================================================
@@ -240,6 +268,20 @@ export const useUIStore = create<UIState & UIActions>()(
         currentNightActorIndex: 0,
         nightActorsOrder: []
       }),
+
+      // 角色分配
+      setAssignmentMode: (active) => set({ assignmentMode: active }),
+      setDraggedCharacter: (characterId) => set({ draggedCharacterId: characterId }),
+
+      // 夜晚行动进度
+      setNightActionInProgress: (inProgress) => set({ nightActionInProgress: inProgress }),
+
+      // 投票
+      setVote: (playerId, voted) => set(state => ({
+        votesCollected: { ...state.votesCollected, [playerId]: voted }
+      })),
+      clearVotes: () => set({ votesCollected: {}, showVoteResults: false }),
+      setShowVoteResults: (show) => set({ showVoteResults: show }),
 
       // 重置
       reset: () => set(initialState)
