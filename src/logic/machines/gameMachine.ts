@@ -4,7 +4,7 @@
  * 使用 XState v5 实现游戏流程控制
  */
 
-import { setup, assign, assertEvent } from 'xstate';
+import { setup, assign, assertEvent, and } from 'xstate';
 import {
     type PlayerId,
     type CharacterId,
@@ -19,6 +19,17 @@ import {
     countAlivePlayers,
     getVotesRequired
 } from '../../types/game';
+import {
+    type NightQueue,
+    buildNightQueue,
+    getCurrentAction,
+    completeCurrentAction,
+    isNightComplete
+} from '../night/nightActions';
+import {
+    checkGameEnd,
+    checkScarletWomanTransform
+} from '../game/gameEnd';
 
 // ============================================================
 // 状态机上下文类型
@@ -37,6 +48,8 @@ export interface GameContext {
     isFirstNight: boolean;
     /** 游戏日志 */
     history: LogEntry[];
+    /** 夜晚行动队列 */
+    nightQueue: NightQueue | null;
     /** 当前被提名者 */
     currentNomineeId: PlayerId | null;
     /** 当前提名者 */
@@ -51,6 +64,8 @@ export interface GameContext {
     executionTarget: PlayerId | null;
     /** 今日最高票数 */
     highestVoteCount: number;
+    /** 今日今日是否已处决 */
+    executedToday: boolean;
     /** 提名历史 */
     nominationHistory: NominationRecord[];
     /** 获胜阵营 */
@@ -70,6 +85,9 @@ export type GameMachineEvent =
     | { type: 'ASSIGN_ROLE'; playerId: PlayerId; characterId: CharacterId }
     | { type: 'START_GAME' }
     // 夜晚
+    | { type: 'PROCEED_NIGHT_ACTION' }
+    | { type: 'USE_ABILITY'; actorId: PlayerId; targetIds?: PlayerId[] }
+    | { type: 'SKIP_NIGHT_ACTION' }
     | { type: 'END_NIGHT' }
     // 白天
     | { type: 'NOMINATE'; nominatorId: PlayerId; nomineeId: PlayerId }
@@ -82,9 +100,11 @@ export type GameMachineEvent =
     | { type: 'END_DAY' }
     // 游戏结束
     | { type: 'END_GAME'; winner: Team; reason: string }
+    | { type: 'CHECK_GAME_END' }
     // 特殊
     | { type: 'KILL_PLAYER'; playerId: PlayerId; cause: string }
-    | { type: 'REVIVE_PLAYER'; playerId: PlayerId };
+    | { type: 'REVIVE_PLAYER'; playerId: PlayerId }
+    | { type: 'TRANSFORM_SCARLET_WOMAN'; playerId: PlayerId };
 
 // ============================================================
 // 辅助函数
@@ -187,6 +207,10 @@ export const gameMachine = setup({
         enterNight: assign({
             currentNight: ({ context }) => context.currentNight + 1,
             isFirstNight: ({ context }) => context.currentNight === 0,
+            nightQueue: ({ context }) => {
+                const isFirst = context.currentNight === 0;
+                return buildNightQueue(context.players, isFirst, context.currentNight + 1);
+            },
             history: ({ context }) => {
                 const nightNum = context.currentNight + 1;
                 const log = createLogEntry(
@@ -199,6 +223,19 @@ export const gameMachine = setup({
             }
         }),
 
+        // 推进夜晚行动
+        proceedNightAction: assign({
+            nightQueue: ({ context }) => {
+                if (!context.nightQueue) return null;
+                return completeCurrentAction(context.nightQueue);
+            }
+        }),
+
+        // 清除夜晚队列
+        clearNightQueue: assign({
+            nightQueue: () => null
+        }),
+
         // 进入白天
         enterDay: assign({
             currentDay: ({ context }) => context.currentDay + 1,
@@ -208,6 +245,7 @@ export const gameMachine = setup({
             nominatorsToday: () => [],
             executionTarget: () => null,
             highestVoteCount: () => 0,
+            executedToday: () => false,
             history: ({ context }) => {
                 const dayNum = context.currentDay + 1;
                 const log = createLogEntry(
@@ -343,6 +381,7 @@ export const gameMachine = setup({
                 ),
                 executionTarget: null,
                 highestVoteCount: 0,
+                executedToday: true,
                 history: [...context.history, log]
             };
         }),
@@ -405,6 +444,29 @@ export const gameMachine = setup({
                 );
                 return [...context.history, log];
             }
+        }),
+
+        // 猩红女郎转换为恶魔
+        transformScarletWoman: assign({
+            players: ({ context, event }) => {
+                assertEvent(event, 'TRANSFORM_SCARLET_WOMAN');
+                return context.players.map(p =>
+                    p.id === event.playerId
+                        ? { ...p, characterId: 'imp' } // 变成小恶魔
+                        : p
+                );
+            },
+            history: ({ context, event }) => {
+                assertEvent(event, 'TRANSFORM_SCARLET_WOMAN');
+                const player = context.players.find(p => p.id === event.playerId);
+                const log = createLogEntry(
+                    LogType.CUSTOM,
+                    `${player?.name} (猩红女郎) 变成了小恶魔！`,
+                    context,
+                    { playerId: event.playerId }
+                );
+                return [...context.history, log];
+            }
         })
     },
 
@@ -450,6 +512,24 @@ export const gameMachine = setup({
         // 是否有处决目标
         hasExecutionTarget: ({ context }) => {
             return context.executionTarget !== null;
+        },
+        // 夜晚是否完成
+        isNightComplete: ({ context }) => {
+            return context.nightQueue ? isNightComplete(context.nightQueue) : true;
+        },
+        // 是否应该检查游戏结束
+        shouldCheckGameEnd: ({ context }) => {
+            const result = checkGameEnd(
+                context.players,
+                context.executedToday,
+                context.executionTarget || undefined
+            );
+            return result.isEnded;
+        },
+        // 猩红女郎是否应该转换
+        shouldTransformScarletWoman: ({ context }) => {
+            const result = checkScarletWomanTransform(context.players);
+            return result.shouldTransform;
         }
     }
 }).createMachine({
@@ -462,6 +542,7 @@ export const gameMachine = setup({
         currentNight: 0,
         isFirstNight: true,
         history: [],
+        nightQueue: null,
         currentNomineeId: null,
         currentNominatorId: null,
         currentVotes: {},
@@ -469,12 +550,37 @@ export const gameMachine = setup({
         nominatorsToday: [],
         executionTarget: null,
         highestVoteCount: 0,
+        executedToday: false,
         nominationHistory: [],
         winner: null,
         endReason: null
     },
 
     initial: 'setup',
+
+    on: {
+        // END_GAME 可以从任何状态触发
+        END_GAME: {
+            target: '.gameOver',
+            actions: 'setGameEnd'
+        },
+        // CHECK_GAME_END 也可以从任何状态触发
+        CHECK_GAME_END: {
+            target: '.gameOver',
+            guard: 'shouldCheckGameEnd',
+            actions: ({ context }) => {
+                const result = checkGameEnd(context.players, context.executedToday, context.executionTarget || undefined);
+                if (result.isEnded && result.winner && result.reason) {
+                    // 这会在 setGameEnd action 中处理
+                    return { type: 'END_GAME', winner: result.winner, reason: result.reason };
+                }
+            }
+        },
+        // KILL_PLAYER 可以从任何状态触发（说书人随时可以杀死玩家）
+        KILL_PLAYER: {
+            actions: 'killPlayer'
+        }
+    },
 
     states: {
         // ========================================
@@ -493,7 +599,7 @@ export const gameMachine = setup({
                 },
                 START_GAME: {
                     target: 'gameLoop',
-                    guard: 'hasEnoughPlayers',
+                    guard: and(['hasEnoughPlayers', 'allPlayersHaveRoles']),
                     actions: 'logGameStart'
                 }
             }
@@ -509,13 +615,41 @@ export const gameMachine = setup({
                 // 夜晚阶段
                 night: {
                     entry: 'enterNight',
+                    exit: 'clearNightQueue',
                     on: {
+                        PROCEED_NIGHT_ACTION: {
+                            actions: 'proceedNightAction'
+                        },
+                        USE_ABILITY: {
+                            // 使用角色能力（由UI调用）
+                            actions: 'proceedNightAction'
+                        },
+                        SKIP_NIGHT_ACTION: {
+                            actions: 'proceedNightAction'
+                        },
                         KILL_PLAYER: {
                             actions: 'killPlayer'
+                        },
+                        TRANSFORM_SCARLET_WOMAN: {
+                            guard: 'shouldTransformScarletWoman',
+                            actions: 'transformScarletWoman'
                         },
                         END_NIGHT: {
                             target: 'day'
                         },
+                        CHECK_GAME_END: [
+                            {
+                                target: '#bloodOnTheClockTower.gameOver',
+                                guard: 'shouldCheckGameEnd',
+                                actions: ({ context }) => {
+                                    const result = checkGameEnd(context.players, context.executedToday);
+                                    if (result.isEnded && result.winner && result.reason) {
+                                        // 触发游戏结束
+                                        return { type: 'END_GAME', winner: result.winner, reason: result.reason };
+                                    }
+                                }
+                            }
+                        ],
                         END_GAME: {
                             target: '#bloodOnTheClockTower.gameOver',
                             actions: 'setGameEnd'
@@ -579,14 +713,75 @@ export const gameMachine = setup({
                 // 处决阶段
                 execution: {
                     on: {
-                        EXECUTE: {
-                            target: 'night',
-                            guard: 'hasExecutionTarget',
-                            actions: 'executePlayer'
-                        },
+                        EXECUTE: [
+                            {
+                                // 处决后检查是否游戏结束
+                                target: '#bloodOnTheClockTower.gameOver',
+                                guard: ({ context }) => {
+                                    // 先模拟处决
+                                    const afterExecution = context.players.map(p =>
+                                        p.id === context.executionTarget
+                                            ? { ...p, isDead: true }
+                                            : p
+                                    );
+                                    const result = checkGameEnd(afterExecution, true, context.executionTarget || undefined);
+                                    return result.isEnded;
+                                },
+                                actions: [
+                                    'executePlayer',
+                                    ({ context }) => {
+                                        const result = checkGameEnd(context.players, true, context.executionTarget || undefined);
+                                        if (result.isEnded && result.winner && result.reason) {
+                                            return { type: 'END_GAME', winner: result.winner, reason: result.reason };
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                // 处决后检查猩红女郎
+                                target: 'night',
+                                guard: ({ context }) => {
+                                    const hasTarget = context.executionTarget !== null;
+                                    if (!hasTarget) return false;
+
+                                    // 模拟处决后检查猩红女郎
+                                    const afterExecution = context.players.map(p =>
+                                        p.id === context.executionTarget
+                                            ? { ...p, isDead: true }
+                                            : p
+                                    );
+                                    const scarletResult = checkScarletWomanTransform(afterExecution);
+                                    return scarletResult.shouldTransform;
+                                },
+                                actions: [
+                                    'executePlayer',
+                                    ({ context }) => {
+                                        const scarletResult = checkScarletWomanTransform(context.players);
+                                        if (scarletResult.shouldTransform && scarletResult.scarletWomanId) {
+                                            return {
+                                                type: 'TRANSFORM_SCARLET_WOMAN',
+                                                playerId: scarletResult.scarletWomanId
+                                            };
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                // 正常处决
+                                target: 'night',
+                                guard: 'hasExecutionTarget',
+                                actions: 'executePlayer'
+                            }
+                        ],
                         SKIP_EXECUTION: {
                             target: 'night'
                         },
+                        CHECK_GAME_END: [
+                            {
+                                target: '#bloodOnTheClockTower.gameOver',
+                                guard: 'shouldCheckGameEnd'
+                            }
+                        ],
                         END_GAME: {
                             target: '#bloodOnTheClockTower.gameOver',
                             actions: 'setGameEnd'
