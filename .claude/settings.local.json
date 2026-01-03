@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "WebSearch",
+      "Bash(echo:*)",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp:*)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(npx --version)",
+      "Bash(node --version:*)",
+      "Bash(cmd /c \"npx -y @modelcontextprotocol/server-filesystem --version 2>&1\")",
+      "Bash(git --version)",
+      "Bash(npx:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(ls:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(tee:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "mcp__filesystem__directory_tree",
+      "mcp__filesystem__list_directory",
+      "mcp__filesystem__read_text_file",
+      "Bash(xargs:*)"
+    ]
+  }
+}

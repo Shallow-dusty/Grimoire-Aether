@@ -6,13 +6,19 @@ import { gameMachine, type GameMachineEvent } from '../logic/machines/gameMachin
 import { StageWrapper } from '../components/game/StageWrapper';
 import { SeatingChart } from '../components/game/board/SeatingChart';
 import { BackgroundEffect } from '../components/ui/layout/BackgroundEffect';
-import { Loader2, Moon, Sun, Shield, Sword, Skull, Crown } from 'lucide-react';
+import { Loader2, Moon, Sun, Shield, Sword, Skull, Crown, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { updateParticipant, supabase } from '../lib/supabase';
 import { ArcaneMenu } from '../components/game/ui/ArcaneMenu';
 import { PhaseIndicator } from '../components/ui/layout/PhaseIndicator';
 import { RoleAssignment } from '../components/game/phases/RoleAssignment';
 import { randomAssignRoles, balancedAssignRoles } from '../utils/roleAssignment';
+import { NightPhase } from '../components/game/phases/NightPhase';
+import { buildNightQueue } from '../logic/night/nightActions';
+import { DayPhase } from '../components/game/phases/DayPhase';
+import { GameOver } from '../components/game/phases/GameOver';
+import { GameInfo } from '../components/game/ui/GameInfo';
+import { useUIStore } from '../logic/stores/uiStore';
 
 export default function GrimoirePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
@@ -21,6 +27,9 @@ export default function GrimoirePage() {
 
     const { session, participants, loading, error } = useGameSession(sessionId!);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+
+    // UI Store
+    const { isSidebarOpen, setSidebarOpen, showRoles, toggleShowRoles } = useUIStore();
 
     // XState 游戏状态机 (仅说书人激活)
     const [state, send] = useMachine(gameMachine, {
@@ -145,6 +154,41 @@ export default function GrimoirePage() {
         }
     };
 
+    // 夜晚行动处理
+    const handleUseAbility = async (playerId: string, targets?: string[]) => {
+        if (role !== 'storyteller') return;
+
+        try {
+            // 发送状态机事件
+            send({ type: 'USE_ABILITY', playerId, targets });
+
+            // 可以在这里添加能力执行逻辑（记录到历史等）
+        } catch (err) {
+            console.error('Failed to use ability:', err);
+        }
+    };
+
+    const handleSkipNightAction = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'SKIP_NIGHT_ACTION' });
+    };
+
+    const handleEndNight = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'END_NIGHT' });
+    };
+
+    // 白天阶段处理
+    const handleStartNomination = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'START_NOMINATION' });
+    };
+
+    const handleEndDay = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'END_DAY' });
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-black flex items-center justify-center text-amber-500">
@@ -264,19 +308,30 @@ export default function GrimoirePage() {
             
             {/* 顶部 HUD */}
             <div className="absolute top-0 left-0 right-0 z-20 p-6 flex justify-between items-start pointer-events-none">
-                <div className="flex flex-col gap-1 pointer-events-auto">
-                    <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-600 drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]">
-                        {session.name || '未命名魔典'}
-                    </h1>
-                    <div className="flex items-center gap-4 text-xs tracking-[0.2em] text-stone-400 uppercase">
-                        <span className="flex items-center gap-1">
-                            <Crown className="w-3 h-3 text-red-500" />
-                            {role === 'storyteller' ? '说书人模式' : '玩家模式'}
-                        </span>
-                        <span className="w-px h-3 bg-white/20" />
-                        <span>代码: <span className="text-amber-400 font-bold">{session.join_code}</span></span>
-                        <span className="w-px h-3 bg-white/20" />
-                        <span>玩家: {participants.length}</span>
+                <div className="flex items-start gap-4 pointer-events-auto">
+                    {/* 侧边栏按钮 */}
+                    <button
+                        onClick={() => setSidebarOpen(true)}
+                        className="p-3 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl hover:bg-black/60 transition-all hover:scale-105"
+                        title="打开游戏信息"
+                    >
+                        <Menu className="w-5 h-5 text-amber-400" />
+                    </button>
+
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-600 drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]">
+                            {session.name || '未命名魔典'}
+                        </h1>
+                        <div className="flex items-center gap-4 text-xs tracking-[0.2em] text-stone-400 uppercase">
+                            <span className="flex items-center gap-1">
+                                <Crown className="w-3 h-3 text-red-500" />
+                                {role === 'storyteller' ? '说书人模式' : '玩家模式'}
+                            </span>
+                            <span className="w-px h-3 bg-white/20" />
+                            <span>代码: <span className="text-amber-400 font-bold">{session.join_code}</span></span>
+                            <span className="w-px h-3 bg-white/20" />
+                            <span>玩家: {participants.length}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -374,6 +429,64 @@ export default function GrimoirePage() {
                     />
                 )}
             </AnimatePresence>
+
+            {/* 夜晚阶段面板 */}
+            <AnimatePresence>
+                {state.matches('gameLoop.night') && state.context.nightQueue && (
+                    <NightPhase
+                        nightQueue={state.context.nightQueue}
+                        players={state.context.players}
+                        onUseAbility={handleUseAbility}
+                        onSkipAction={handleSkipNightAction}
+                        onEndNight={handleEndNight}
+                        isStoryteller={role === 'storyteller'}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* 白天阶段面板 */}
+            <AnimatePresence>
+                {typeof state.value === 'object' && 'gameLoop' in state.value &&
+                 typeof state.value.gameLoop === 'object' && 'day' in state.value.gameLoop && (
+                    <DayPhase
+                        machineState={state}
+                        players={state.context.players}
+                        onStartNomination={handleStartNomination}
+                        onEndDay={handleEndDay}
+                        isStoryteller={role === 'storyteller'}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* 游戏结束面板 */}
+            <AnimatePresence>
+                {state.matches('gameOver') && (
+                    <GameOver
+                        winner={state.context.winner}
+                        endReason={state.context.endReason}
+                        players={state.context.players}
+                        currentDay={state.context.currentDay}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* 游戏信息侧边栏 */}
+            <GameInfo
+                players={state.context.players}
+                currentDay={state.context.currentDay}
+                currentNight={state.context.currentNight}
+                phase={
+                    state.matches('setup') ? 'setup' :
+                    state.matches('gameLoop.night') ? 'night' :
+                    state.matches('gameLoop.execution') ? 'execution' :
+                    state.matches('gameOver') ? 'gameOver' : 'day'
+                }
+                isOpen={isSidebarOpen}
+                onClose={() => setSidebarOpen(false)}
+                showRoles={showRoles}
+                onToggleRoles={toggleShowRoles}
+                isStoryteller={role === 'storyteller'}
+            />
         </div>
     );
 }
