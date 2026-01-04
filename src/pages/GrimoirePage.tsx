@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useMachine } from '@xstate/react';
 import { useGameSession } from '../hooks/useSupabase';
@@ -87,10 +87,38 @@ export default function GrimoirePage() {
     });
 
     // 同步状态机变化到 Supabase (仅说书人)
+    // 使用 debounce 和关键状态检测来减少频繁写入
+    const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // 提取关键状态值（只有这些变化时才触发同步）
+    const criticalState = useMemo(() => ({
+        phase: state.value,
+        currentDay: state.context.currentDay,
+        currentNight: state.context.currentNight,
+        executedToday: state.context.executedToday,
+        executionTarget: state.context.executionTarget,
+        winner: state.context.winner,
+        endReason: state.context.endReason
+    }), [
+        state.value,
+        state.context.currentDay,
+        state.context.currentNight,
+        state.context.executedToday,
+        state.context.executionTarget,
+        state.context.winner,
+        state.context.endReason
+    ]);
+
     useEffect(() => {
         if (role !== 'storyteller' || !sessionId) return;
 
-        const syncToSupabase = async () => {
+        // 清除之前的定时器
+        if (syncTimeoutRef.current) {
+            clearTimeout(syncTimeoutRef.current);
+        }
+
+        // 使用 debounce 延迟同步（500ms）
+        syncTimeoutRef.current = setTimeout(async () => {
             try {
                 // 同步核心状态
                 await supabase
@@ -115,10 +143,15 @@ export default function GrimoirePage() {
             } catch (err) {
                 console.error('Failed to sync state to Supabase:', err);
             }
-        };
+        }, 500);
 
-        syncToSupabase();
-    }, [state, role, sessionId, session?.metadata]);
+        // 清理函数
+        return () => {
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+            }
+        };
+    }, [criticalState, role, sessionId, session?.metadata, state.context, state]);
 
     // 右键菜单状态
     const [menuState, setMenuState] = useState<{
@@ -141,6 +174,15 @@ export default function GrimoirePage() {
 
             // 同步到数据库
             await updateParticipant(playerId, { character_id: characterId });
+
+            // 记录角色分配日志
+            await logGameAction(
+                sessionId!,
+                'ASSIGN_ROLE',
+                { characterId },
+                undefined, // 说书人操作，无 actor
+                playerId
+            );
         } catch (err) {
             console.error('Failed to assign role:', err);
         }
@@ -178,7 +220,19 @@ export default function GrimoirePage() {
             // 发送状态机事件
             send({ type: 'USE_ABILITY', playerId, targets });
 
-            // 可以在这里添加能力执行逻辑（记录到历史等）
+            // 记录能力使用日志
+            const player = state.context.players.find(p => p.id === playerId);
+            await logGameAction(
+                sessionId!,
+                'NIGHT_ACTION',
+                {
+                    characterId: player?.characterId,
+                    targets,
+                    night: state.context.currentNight
+                },
+                playerId,
+                targets?.[0] // 主要目标（如果有）
+            );
         } catch (err) {
             console.error('Failed to use ability:', err);
         }
@@ -245,14 +299,50 @@ export default function GrimoirePage() {
         send({ type: 'CAST_VOTE', voterId, vote: voteFor });
     };
 
-    const handleEndVoting = () => {
+    const handleEndVoting = async () => {
         if (role !== 'storyteller') return;
         send({ type: 'FINISH_VOTE' });
+
+        // 记录投票结果
+        try {
+            await logGameAction(
+                sessionId!,
+                'FINISH_VOTE',
+                {
+                    day: state.context.currentDay,
+                    votes: state.context.currentVotes,
+                    nomineeId: state.context.currentNomineeId,
+                    nominatorId: state.context.currentNominatorId,
+                    votesFor: Object.values(state.context.currentVotes).filter(v => v === true).length,
+                    votesAgainst: Object.values(state.context.currentVotes).filter(v => v === false).length
+                },
+                state.context.currentNominatorId || undefined,
+                state.context.currentNomineeId || undefined
+            );
+        } catch (err) {
+            console.error('Failed to log vote result:', err);
+        }
     };
 
-    const handleConfirmExecution = () => {
+    const handleConfirmExecution = async () => {
         if (role !== 'storyteller') return;
         send({ type: 'EXECUTE' });
+
+        // 记录处决动作
+        try {
+            await logGameAction(
+                sessionId!,
+                'EXECUTE',
+                {
+                    day: state.context.currentDay,
+                    voteCount: Object.values(state.context.currentVotes).filter(v => v === true).length
+                },
+                undefined,
+                state.context.executionTarget || undefined
+            );
+        } catch (err) {
+            console.error('Failed to log execution:', err);
+        }
     };
 
     const handleContinueAfterVote = () => {
