@@ -12,7 +12,7 @@ import { updateParticipant, supabase, logGameAction, checkDailyNomination } from
 import { ArcaneMenu } from '../components/game/ui/ArcaneMenu';
 import { PhaseIndicator } from '../components/ui/layout/PhaseIndicator';
 import { RoleAssignment } from '../components/game/phases/RoleAssignment';
-import { randomAssignRoles, balancedAssignRoles } from '../utils/roleAssignment';
+import { randomAssignRoles, balancedAssignRoles, applyDrunkMechanism } from '../utils/roleAssignment';
 import { NightPhase } from '../components/game/phases/NightPhase';
 import { buildNightQueue } from '../logic/night/nightActions';
 import { DayPhase } from '../components/game/phases/DayPhase';
@@ -34,11 +34,27 @@ export default function GrimoirePage() {
     // 数据过滤：玩家只能看到自己的角色，说书人能看到所有角色
     const visibleParticipants = role === 'storyteller'
         ? participants
-        : participants.map(p => ({
-            ...p,
-            // 只保留当前玩家自己的 character_id，其他人的都隐藏
-            character_id: p.id === currentPlayerId ? p.character_id : null
-        }));
+        : participants.map(p => {
+            if (p.id === currentPlayerId) {
+                // 玩家视角：显示自己的角色
+                // 如果是醉鬼，显示假角色
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const statusFlags = p.status_flags as any;
+                const isDrunk = statusFlags?.drunk === true;
+                const fakeCharacterId = statusFlags?.fakeCharacterId;
+
+                return {
+                    ...p,
+                    character_id: isDrunk && fakeCharacterId ? fakeCharacterId : p.character_id
+                };
+            } else {
+                // 其他玩家：隐藏角色
+                return {
+                    ...p,
+                    character_id: null
+                };
+            }
+        });
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
     // 玩家角色卡片显示状态
@@ -193,10 +209,27 @@ export default function GrimoirePage() {
         if (role !== 'storyteller') return;
 
         const playerIds = participants.map(p => p.id);
-        const assignments = randomAssignRoles(playerIds);
+        const baseAssignments = randomAssignRoles(playerIds);
+
+        // 应用醉鬼机制
+        const { assignments, drunkPlayerId, fakeCharacterId } = applyDrunkMechanism(baseAssignments);
 
         for (const [playerId, characterId] of Object.entries(assignments)) {
             await handleAssignRole(playerId, characterId);
+
+            // 如果是醉鬼玩家，额外标记状态
+            if (playerId === drunkPlayerId && fakeCharacterId) {
+                await updateParticipant(playerId, {
+                    status_flags: {
+                        poisoned: false,
+                        drunk: true,
+                        protected: false,
+                        mad: false,
+                        custom: [],
+                        fakeCharacterId // 存储假角色ID
+                    }
+                });
+            }
         }
     };
 
@@ -205,10 +238,27 @@ export default function GrimoirePage() {
         if (role !== 'storyteller') return;
 
         const playerIds = participants.map(p => p.id);
-        const assignments = balancedAssignRoles(playerIds);
+        const baseAssignments = balancedAssignRoles(playerIds);
+
+        // 应用醉鬼机制
+        const { assignments, drunkPlayerId, fakeCharacterId } = applyDrunkMechanism(baseAssignments);
 
         for (const [playerId, characterId] of Object.entries(assignments)) {
             await handleAssignRole(playerId, characterId);
+
+            // 如果是醉鬼玩家，额外标记状态
+            if (playerId === drunkPlayerId && fakeCharacterId) {
+                await updateParticipant(playerId, {
+                    status_flags: {
+                        poisoned: false,
+                        drunk: true,
+                        protected: false,
+                        mad: false,
+                        custom: [],
+                        fakeCharacterId // 存储假角色ID
+                    }
+                });
+            }
         }
     };
 

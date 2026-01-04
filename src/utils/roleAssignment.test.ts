@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { randomAssignRoles, balancedAssignRoles } from './roleAssignment';
+import { randomAssignRoles, balancedAssignRoles, applyDrunkMechanism } from './roleAssignment';
 import { getStandardComposition, TROUBLE_BREWING_CHARACTERS } from '../data/characters/trouble-brewing';
 import { Team } from '../types/game';
 
@@ -200,6 +200,87 @@ describe('roleAssignment', () => {
             });
 
             expect(randomCounts).toEqual(balancedCounts);
+        });
+    });
+
+    describe('applyDrunkMechanism', () => {
+        it('should return null drunk info when no townsfolk present', () => {
+            // 创建一个只有恶魔的分配（边缘案例）
+            const assignments = {
+                'p1': 'imp'
+            };
+
+            const result = applyDrunkMechanism(assignments);
+
+            expect(result.drunkPlayerId).toBeNull();
+            expect(result.fakeCharacterId).toBeNull();
+            expect(result.assignments).toEqual(assignments);
+        });
+
+        it('should select one townsfolk as drunk', () => {
+            const playerIds = Array.from({ length: 7 }, (_, i) => `p${i + 1}`);
+            const assignments = randomAssignRoles(playerIds);
+
+            const result = applyDrunkMechanism(assignments);
+
+            // 应该选中一名镇民
+            if (result.drunkPlayerId) {
+                const drunkRealRole = assignments[result.drunkPlayerId];
+                const drunkCharacter = TROUBLE_BREWING_CHARACTERS.find(c => c.id === drunkRealRole);
+
+                expect(drunkCharacter?.team).toBe(Team.TOWNSFOLK);
+                expect(result.fakeCharacterId).toBeDefined();
+            }
+        });
+
+        it('should assign different fake character than real character', () => {
+            const playerIds = Array.from({ length: 7 }, (_, i) => `p${i + 1}`);
+            const assignments = randomAssignRoles(playerIds);
+
+            const result = applyDrunkMechanism(assignments);
+
+            if (result.drunkPlayerId && result.fakeCharacterId) {
+                const realCharacterId = assignments[result.drunkPlayerId];
+                expect(result.fakeCharacterId).not.toBe(realCharacterId);
+            }
+        });
+
+        it('should assign fake character that is also a townsfolk', () => {
+            const playerIds = Array.from({ length: 10 }, (_, i) => `p${i + 1}`);
+            const assignments = randomAssignRoles(playerIds);
+
+            const result = applyDrunkMechanism(assignments);
+
+            if (result.fakeCharacterId) {
+                const fakeCharacter = TROUBLE_BREWING_CHARACTERS.find(c => c.id === result.fakeCharacterId);
+                expect(fakeCharacter?.team).toBe(Team.TOWNSFOLK);
+            }
+        });
+
+        it('should not modify original assignments object', () => {
+            const playerIds = Array.from({ length: 7 }, (_, i) => `p${i + 1}`);
+            const assignments = randomAssignRoles(playerIds);
+            const originalAssignments = { ...assignments };
+
+            const result = applyDrunkMechanism(assignments);
+
+            expect(result.assignments).toEqual(originalAssignments);
+        });
+
+        it('should work with both random and balanced assignments', () => {
+            const playerIds = Array.from({ length: 8 }, (_, i) => `p${i + 1}`);
+
+            // 测试随机分配
+            const randomAssignments = randomAssignRoles(playerIds);
+            const randomResult = applyDrunkMechanism(randomAssignments);
+
+            // 测试平衡分配
+            const balancedAssignments = balancedAssignRoles(playerIds);
+            const balancedResult = applyDrunkMechanism(balancedAssignments);
+
+            // 两种方式都应该能正确应用醉鬼机制（drunkPlayerId 应该是字符串或 null）
+            expect(typeof randomResult.drunkPlayerId === 'string' || randomResult.drunkPlayerId === null).toBe(true);
+            expect(typeof balancedResult.drunkPlayerId === 'string' || balancedResult.drunkPlayerId === null).toBe(true);
         });
     });
 });

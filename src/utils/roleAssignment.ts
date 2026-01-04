@@ -170,3 +170,54 @@ function shuffleArray<T>(array: T[]): T[] {
     }
     return result;
 }
+
+/**
+ * 应用醉鬼机制
+ * 随机选择一名镇民成为醉鬼，给予假角色
+ * @param assignments 原始角色分配
+ * @returns 包含醉鬼标记的分配信息
+ */
+export function applyDrunkMechanism(
+    assignments: Record<PlayerId, string>
+): {
+    assignments: Record<PlayerId, string>;
+    drunkPlayerId: PlayerId | null;
+    fakeCharacterId: string | null;
+} {
+    // 找出所有镇民玩家
+    const townsfolkPlayerIds = Object.entries(assignments)
+        .filter(([_, characterId]) => {
+            const character = TROUBLE_BREWING_CHARACTERS.find(c => c.id === characterId);
+            return character?.team === Team.TOWNSFOLK;
+        })
+        .map(([playerId]) => playerId);
+
+    // 如果没有镇民，不应用醉鬼机制
+    if (townsfolkPlayerIds.length === 0) {
+        return {
+            assignments,
+            drunkPlayerId: null,
+            fakeCharacterId: null
+        };
+    }
+
+    // 随机选择一名镇民成为醉鬼
+    const drunkPlayerIndex = Math.floor(Math.random() * townsfolkPlayerIds.length);
+    const drunkPlayerId = townsfolkPlayerIds[drunkPlayerIndex];
+    const realCharacterId = assignments[drunkPlayerId];
+
+    // 获取所有镇民角色（排除真实角色，避免显示相同）
+    const townsfolkCharacters = TROUBLE_BREWING_CHARACTERS.filter(
+        c => c.team === Team.TOWNSFOLK && c.id !== realCharacterId
+    );
+
+    // 随机选择一个假角色
+    const fakeCharacterIndex = Math.floor(Math.random() * townsfolkCharacters.length);
+    const fakeCharacterId = townsfolkCharacters[fakeCharacterIndex].id;
+
+    return {
+        assignments,
+        drunkPlayerId,
+        fakeCharacterId
+    };
+}
