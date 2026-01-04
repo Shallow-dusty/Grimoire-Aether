@@ -72,6 +72,17 @@ export interface GameContext {
     winner: Team | null;
     /** 结束原因 */
     endReason: string | null;
+    /** 时针投票模式 */
+    useClockwiseVoting: boolean;
+    /** 时针投票状态（仅在 useClockwiseVoting 为 true 时有效） */
+    clockwiseVoting: {
+        /** 投票顺序（顺时针玩家 ID 列表） */
+        voteOrder: PlayerId[];
+        /** 当前投票索引 */
+        currentVoteIndex: number;
+        /** 投票记录（null 表示未投票） */
+        votes: Record<PlayerId, boolean | null>;
+    } | null;
 }
 
 // ============================================================
@@ -96,6 +107,15 @@ export type GameMachineEvent =
     | { type: 'START_VOTE' }
     | { type: 'CAST_VOTE'; voterId: PlayerId; vote: boolean }
     | { type: 'FINISH_VOTE' }
+    // 时针投票
+    | { type: 'ENABLE_CLOCKWISE_VOTING' }
+    | { type: 'DISABLE_CLOCKWISE_VOTING' }
+    | { type: 'START_CLOCKWISE_VOTE' }
+    | { type: 'CLOCKWISE_VOTE'; voterId: PlayerId; vote: boolean }
+    | { type: 'CLOCKWISE_NEXT' }
+    | { type: 'CLOCKWISE_PREVIOUS' }
+    | { type: 'FINISH_CLOCKWISE_VOTE' }
+    // 处决
     | { type: 'EXECUTE' }
     | { type: 'SKIP_EXECUTION' }
     | { type: 'END_DAY' }
@@ -361,6 +381,175 @@ export const gameMachine = setup({
             };
         }),
 
+        // ============================================================
+        // 时针投票相关 Actions
+        // ============================================================
+
+        // 启用时针投票模式
+        enableClockwiseVoting: assign({
+            useClockwiseVoting: () => true
+        }),
+
+        // 禁用时针投票模式
+        disableClockwiseVoting: assign({
+            useClockwiseVoting: () => false,
+            clockwiseVoting: () => null
+        }),
+
+        // 初始化时针投票
+        initializeClockwiseVoting: assign({
+            clockwiseVoting: ({ context }) => {
+                // 生成投票顺序：从提名者的下一位开始，顺时针排列
+                const nominator = context.players.find(p => p.id === context.currentNominatorId);
+                if (!nominator) return null;
+
+                // 获取可以投票的玩家（存活 + 幽灵且未使用幽灵投票）
+                const eligibleVoters = context.players.filter(p =>
+                    !p.isDead || (p.isGhost && !p.hasUsedGhostVote)
+                );
+
+                // 按座位顺序排序
+                const sortedVoters = [...eligibleVoters].sort((a, b) => a.seatIndex - b.seatIndex);
+
+                // 找到提名者的座位索引
+                const nominatorSeatIndex = nominator.seatIndex;
+
+                // 从提名者的下一位开始生成投票顺序
+                const voteOrder: PlayerId[] = [];
+                for (let i = 0; i < sortedVoters.length; i++) {
+                    const index = (nominatorSeatIndex + 1 + i) % sortedVoters.length;
+                    const voter = sortedVoters.find(p => p.seatIndex === (eligibleVoters[0].seatIndex + index) % context.players.length);
+                    if (voter && eligibleVoters.some(v => v.id === voter.id)) {
+                        voteOrder.push(voter.id);
+                    }
+                }
+
+                // 如果没有生成顺序，fallback 到所有可投票玩家
+                if (voteOrder.length === 0) {
+                    voteOrder.push(...eligibleVoters.map(p => p.id));
+                }
+
+                // 初始化投票记录
+                const votes: Record<PlayerId, boolean | null> = {};
+                voteOrder.forEach(playerId => {
+                    votes[playerId] = null;
+                });
+
+                return {
+                    voteOrder,
+                    currentVoteIndex: 0,
+                    votes
+                };
+            }
+        }),
+
+        // 记录时针投票
+        recordClockwiseVote: assign({
+            clockwiseVoting: ({ context, event }) => {
+                assertEvent(event, 'CLOCKWISE_VOTE');
+                if (!context.clockwiseVoting) return null;
+
+                return {
+                    ...context.clockwiseVoting,
+                    votes: {
+                        ...context.clockwiseVoting.votes,
+                        [event.voterId]: event.vote
+                    }
+                };
+            }
+        }),
+
+        // 前进到下一位投票者
+        advanceClockwiseVoter: assign({
+            clockwiseVoting: ({ context }) => {
+                if (!context.clockwiseVoting) return null;
+
+                const nextIndex = context.clockwiseVoting.currentVoteIndex + 1;
+                return {
+                    ...context.clockwiseVoting,
+                    currentVoteIndex: nextIndex
+                };
+            }
+        }),
+
+        // 后退到上一位投票者
+        retreatClockwiseVoter: assign({
+            clockwiseVoting: ({ context }) => {
+                if (!context.clockwiseVoting) return null;
+
+                const prevIndex = Math.max(0, context.clockwiseVoting.currentVoteIndex - 1);
+                return {
+                    ...context.clockwiseVoting,
+                    currentVoteIndex: prevIndex
+                };
+            }
+        }),
+
+        // 计算时针投票结果
+        calculateClockwiseVoteResult: assign(({ context }) => {
+            if (!context.clockwiseVoting) {
+                return {};
+            }
+
+            // 统计投票结果
+            const votesFor = Object.values(context.clockwiseVoting.votes).filter(v => v === true).length;
+            const votesAgainst = Object.values(context.clockwiseVoting.votes).filter(v => v === false).length;
+
+            const aliveCount = getAliveCount(context.players);
+            const votesRequired = getVotesRequired(aliveCount);
+            const passed = votesFor >= votesRequired;
+
+            // 转换为标准投票记录
+            const votes: Vote[] = Object.entries(context.clockwiseVoting.votes)
+                .filter(([_, vote]) => vote !== null)
+                .map(([voterId, voted]) => ({
+                    voterId,
+                    nomineeId: context.currentNomineeId!,
+                    voted: voted as boolean,
+                    timestamp: Date.now()
+                }));
+
+            const nominationRecord: NominationRecord = {
+                nominatorId: context.currentNominatorId!,
+                nomineeId: context.currentNomineeId!,
+                votes,
+                votesFor,
+                passed,
+                day: context.currentDay
+            };
+
+            // 更新处决目标
+            let newExecutionTarget = context.executionTarget;
+            let newHighestVoteCount = context.highestVoteCount;
+
+            if (passed && votesFor > context.highestVoteCount) {
+                newExecutionTarget = context.currentNomineeId;
+                newHighestVoteCount = votesFor;
+            }
+
+            const log = createLogEntry(
+                LogType.VOTE,
+                `时针投票结果：${votesFor} 票${passed ? '（通过）' : '（未通过）'}`,
+                context,
+                { votesFor, votesRequired, passed, clockwise: true }
+            );
+
+            return {
+                nominationHistory: [...context.nominationHistory, nominationRecord],
+                executionTarget: newExecutionTarget,
+                highestVoteCount: newHighestVoteCount,
+                currentNomineeId: null,
+                currentNominatorId: null,
+                currentVotes: {},
+                clockwiseVoting: null,
+                history: [...context.history, log]
+            };
+        }),
+
+        // ============================================================
+        // 处决相关 Actions
+        // ============================================================
+
         // 执行处决
         executePlayer: assign(({ context }) => {
             if (!context.executionTarget) return context;
@@ -554,7 +743,9 @@ export const gameMachine = setup({
         executedToday: false,
         nominationHistory: [],
         winner: null,
-        endReason: null
+        endReason: null,
+        useClockwiseVoting: false,
+        clockwiseVoting: null
     },
 
     initial: 'setup',
@@ -683,18 +874,34 @@ export const gameMachine = setup({
                         // 提名阶段
                         nomination: {
                             on: {
-                                NOMINATE: {
-                                    guard: 'isValidNomination',
-                                    actions: 'setNomination',
-                                    target: 'vote' // 直接进入投票
-                                },
+                                NOMINATE: [
+                                    {
+                                        // 如果启用时针投票，进入 clockwiseVote
+                                        guard: and(['isValidNomination', ({ context }) => context.useClockwiseVoting]),
+                                        actions: ['setNomination', 'initializeClockwiseVoting'],
+                                        target: 'clockwiseVote'
+                                    },
+                                    {
+                                        // 否则进入普通投票
+                                        guard: 'isValidNomination',
+                                        actions: 'setNomination',
+                                        target: 'vote'
+                                    }
+                                ],
                                 CANCEL_NOMINATION: {
                                     target: 'discussion'
+                                },
+                                // 允许在提名阶段切换投票模式
+                                ENABLE_CLOCKWISE_VOTING: {
+                                    actions: 'enableClockwiseVoting'
+                                },
+                                DISABLE_CLOCKWISE_VOTING: {
+                                    actions: 'disableClockwiseVoting'
                                 }
                             }
                         },
 
-                        // 投票阶段
+                        // 投票阶段（传统并行投票）
                         vote: {
                             on: {
                                 CAST_VOTE: {
@@ -704,6 +911,30 @@ export const gameMachine = setup({
                                 FINISH_VOTE: {
                                     target: 'discussion',
                                     actions: 'calculateVoteResult'
+                                }
+                            }
+                        },
+
+                        // 时针投票阶段
+                        clockwiseVote: {
+                            on: {
+                                CLOCKWISE_VOTE: {
+                                    actions: 'recordClockwiseVote'
+                                },
+                                CLOCKWISE_NEXT: {
+                                    actions: 'advanceClockwiseVoter'
+                                },
+                                CLOCKWISE_PREVIOUS: {
+                                    actions: 'retreatClockwiseVoter'
+                                },
+                                FINISH_CLOCKWISE_VOTE: {
+                                    target: 'discussion',
+                                    actions: 'calculateClockwiseVoteResult'
+                                },
+                                // 允许切换回普通投票（紧急情况）
+                                DISABLE_CLOCKWISE_VOTING: {
+                                    actions: 'disableClockwiseVoting',
+                                    target: 'vote'
                                 }
                             }
                         }

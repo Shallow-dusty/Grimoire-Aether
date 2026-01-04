@@ -10,6 +10,7 @@ import { type GameMachineState } from '../../../logic/machines/gameMachine';
 import { type PlayerId } from '../../../types/game';
 import { NominationPanel } from '../ui/NominationPanel';
 import { VotingPanel } from '../ui/VotingPanel';
+import { ClockwiseVoting } from '../ui/ClockwiseVoting';
 
 interface DayPhaseProps {
     machineState: GameMachineState;
@@ -26,6 +27,12 @@ interface DayPhaseProps {
     onCancelNomination: () => void;
     onVote: (voterId: PlayerId, voteFor: boolean) => void;
     onEndVoting: () => void;
+    // 时针投票相关
+    onClockwiseVote?: (voterId: PlayerId, voteFor: boolean) => void;
+    onClockwiseNext?: () => void;
+    onClockwisePrevious?: () => void;
+    onFinishClockwiseVote?: () => void;
+    // 其他
     onEndDay: () => void;
     isStoryteller: boolean;
     currentPlayerId?: PlayerId;
@@ -39,6 +46,12 @@ export function DayPhase({
     onCancelNomination,
     onVote,
     onEndVoting,
+    // 时针投票回调
+    onClockwiseVote,
+    onClockwiseNext,
+    onClockwisePrevious,
+    onFinishClockwiseVote,
+    // 其他
     onEndDay,
     isStoryteller,
     currentPlayerId
@@ -53,6 +66,10 @@ export function DayPhase({
     const nominatorsToday = machineState.context.nominatorsToday || [];
     const currentVotes = machineState.context.currentVotes || {};
 
+    // 时针投票状态
+    const useClockwiseVoting = machineState.context.useClockwiseVoting;
+    const clockwiseVoting = machineState.context.clockwiseVoting;
+
     // 从currentVotes计算votesFor和votesAgainst
     const votesFor = Object.entries(currentVotes)
         .filter(([_, vote]) => vote === true)
@@ -64,7 +81,8 @@ export function DayPhase({
     // 判断当前阶段
     const isDiscussion = machineState.matches('gameLoop.day.discussion');
     const isNominating = machineState.matches('gameLoop.day.nomination');
-    const isVoting = machineState.matches('gameLoop.day.voting');
+    const isVoting = machineState.matches('gameLoop.day.vote');
+    const isClockwiseVoting = machineState.matches('gameLoop.day.clockwiseVote');
 
     const alivePlayers = players.filter(p => !p.isDead);
     const deadPlayers = players.filter(p => p.isDead);
@@ -214,6 +232,32 @@ export function DayPhase({
                                 votesAgainst={votesAgainst}
                                 onVote={onVote}
                                 onEndVoting={onEndVoting}
+                                isStoryteller={isStoryteller}
+                                currentPlayerId={currentPlayerId}
+                            />
+                        </motion.div>
+                    )}
+
+                    {/* 时针投票阶段 */}
+                    {isClockwiseVoting && currentNominatorId && currentNomineeId && clockwiseVoting && (
+                        <motion.div
+                            key="clockwise-voting"
+                            className="p-6"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                        >
+                            <ClockwiseVoting
+                                players={players}
+                                nominatorId={currentNominatorId}
+                                nomineeId={currentNomineeId}
+                                voteOrder={clockwiseVoting.voteOrder}
+                                currentVoteIndex={clockwiseVoting.currentVoteIndex}
+                                votes={clockwiseVoting.votes}
+                                onVote={onClockwiseVote || (() => {})}
+                                onNext={onClockwiseNext || (() => {})}
+                                onPrevious={onClockwisePrevious || (() => {})}
+                                onEndVoting={onFinishClockwiseVote || (() => {})}
                                 isStoryteller={isStoryteller}
                                 currentPlayerId={currentPlayerId}
                             />

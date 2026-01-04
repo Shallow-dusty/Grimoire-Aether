@@ -374,6 +374,49 @@ export default function GrimoirePage() {
         }
     };
 
+    // 时针投票处理
+    const handleClockwiseVote = (voterId: string, voteFor: boolean) => {
+        if (role !== 'storyteller') return;
+        send({ type: 'CLOCKWISE_VOTE', voterId, vote: voteFor });
+    };
+
+    const handleClockwiseNext = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'CLOCKWISE_NEXT' });
+    };
+
+    const handleClockwisePrevious = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'CLOCKWISE_PREVIOUS' });
+    };
+
+    const handleFinishClockwiseVote = async () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'FINISH_CLOCKWISE_VOTE' });
+
+        // 记录时针投票结果
+        try {
+            const clockwiseVotes = state.context.clockwiseVoting?.votes || {};
+            await logGameAction(
+                sessionId!,
+                'FINISH_VOTE',
+                {
+                    day: state.context.currentDay,
+                    votes: clockwiseVotes,
+                    nomineeId: state.context.currentNomineeId,
+                    nominatorId: state.context.currentNominatorId,
+                    votesFor: Object.values(clockwiseVotes).filter(v => v === true).length,
+                    votesAgainst: Object.values(clockwiseVotes).filter(v => v === false).length,
+                    clockwise: true
+                },
+                state.context.currentNominatorId || undefined,
+                state.context.currentNomineeId || undefined
+            );
+        } catch (err) {
+            console.error('Failed to log clockwise vote result:', err);
+        }
+    };
+
     const handleConfirmExecution = async () => {
         if (role !== 'storyteller') return;
         send({ type: 'EXECUTE' });
@@ -682,6 +725,10 @@ export default function GrimoirePage() {
                         onCancelNomination={handleCancelNomination}
                         onVote={handleVote}
                         onEndVoting={handleEndVoting}
+                        onClockwiseVote={handleClockwiseVote}
+                        onClockwiseNext={handleClockwiseNext}
+                        onClockwisePrevious={handleClockwisePrevious}
+                        onFinishClockwiseVote={handleFinishClockwiseVote}
                         onEndDay={handleEndDay}
                         isStoryteller={role === 'storyteller'}
                         currentPlayerId={role === 'player' ? searchParams.get('playerId') || undefined : undefined}
