@@ -264,10 +264,15 @@ describe('GameMachine State Machine', () => {
             const nominatorId = context.players[0].id;
             const nomineeId = context.players[5].id; // 提名爪牙
 
+            // 先进入提名阶段
+            actor.send({ type: 'ENTER_NOMINATION' });
+            expect(actor.getSnapshot().value).toEqual({ gameLoop: { day: 'nomination' } });
+
+            // 然后进行提名（会直接进入投票）
             actor.send({ type: 'NOMINATE', nominatorId, nomineeId });
 
             const snapshot = actor.getSnapshot();
-            expect(snapshot.value).toEqual({ gameLoop: { day: 'nomination' } });
+            expect(snapshot.value).toEqual({ gameLoop: { day: 'vote' } });
 
             const updatedContext = snapshot.context;
             expect(updatedContext.currentNominatorId).toBe(nominatorId);
@@ -281,12 +286,15 @@ describe('GameMachine State Machine', () => {
             // 先杀死玩家
             actor.send({ type: 'KILL_PLAYER', playerId: deadPlayerId, cause: '测试' });
 
-            // 尝试提名
+            // 进入提名阶段
+            actor.send({ type: 'ENTER_NOMINATION' });
+
+            // 尝试提名（应该被guard阻止）
             actor.send({ type: 'NOMINATE', nominatorId: deadPlayerId, nomineeId: context.players[1].id });
 
-            // 应该还在 discussion 阶段
+            // 应该还在 nomination 阶段（因为提名被阻止了）
             const snapshot = actor.getSnapshot();
-            expect(snapshot.value).toEqual({ gameLoop: { day: 'discussion' } });
+            expect(snapshot.value).toEqual({ gameLoop: { day: 'nomination' } });
         });
 
         it('同一玩家不能在同一天被提名两次', () => {
@@ -296,15 +304,22 @@ describe('GameMachine State Machine', () => {
             const nomineeId = context.players[5].id;
 
             // 第一次提名
+            actor.send({ type: 'ENTER_NOMINATION' });
             actor.send({ type: 'NOMINATE', nominatorId: nominatorId1, nomineeId });
-            actor.send({ type: 'CANCEL_NOMINATION' });
 
-            // 第二次提名同一个玩家
+            // 应该进入投票
+            expect(actor.getSnapshot().value).toEqual({ gameLoop: { day: 'vote' } });
+
+            // 结束投票返回讨论
+            actor.send({ type: 'FINISH_VOTE' });
+
+            // 第二次尝试提名同一个玩家
+            actor.send({ type: 'ENTER_NOMINATION' });
             actor.send({ type: 'NOMINATE', nominatorId: nominatorId2, nomineeId });
 
-            // 应该还在 discussion（因为被拒绝了）
+            // 应该还在 nomination（因为被guard拒绝了）
             const snapshot = actor.getSnapshot();
-            expect(snapshot.value).toEqual({ gameLoop: { day: 'discussion' } });
+            expect(snapshot.value).toEqual({ gameLoop: { day: 'nomination' } });
         });
     });
 
@@ -326,8 +341,8 @@ describe('GameMachine State Machine', () => {
 
             // 进行提名
             const ctx = actor.getSnapshot().context;
+            actor.send({ type: 'ENTER_NOMINATION' });
             actor.send({ type: 'NOMINATE', nominatorId: ctx.players[0].id, nomineeId: ctx.players[5].id });
-            actor.send({ type: 'START_VOTE' });
         });
 
         it('应该进入投票阶段', () => {
@@ -406,8 +421,8 @@ describe('GameMachine State Machine', () => {
 
             // 提名和投票
             const ctx = actor.getSnapshot().context;
+            actor.send({ type: 'ENTER_NOMINATION' });
             actor.send({ type: 'NOMINATE', nominatorId: ctx.players[0].id, nomineeId: ctx.players[5].id });
-            actor.send({ type: 'START_VOTE' });
 
             // 投 4 票通过
             for (let i = 0; i < 4; i++) {

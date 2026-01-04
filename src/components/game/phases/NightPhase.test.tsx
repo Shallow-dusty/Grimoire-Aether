@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NightPhase } from './NightPhase';
 import type { NightQueue } from '../../../logic/night/nightActions';
 
@@ -158,7 +158,7 @@ describe('NightPhase', () => {
             expect(screen.getByRole('button', { name: /跳过/ })).toBeInTheDocument();
         });
 
-        it('should call onUseAbility when clicking execute button', () => {
+        it('should call onUseAbility when clicking execute button', async () => {
             const onUseAbility = vi.fn();
             const nightQueue = createMockNightQueue(0, true);
 
@@ -175,7 +175,10 @@ describe('NightPhase', () => {
             const executeButton = screen.getByRole('button', { name: /执行能力/ });
             fireEvent.click(executeButton);
 
-            expect(onUseAbility).toHaveBeenCalledWith('p1', undefined);
+            // washerwoman 是 targetType: 'none'，会自动在 100ms 后调用 onConfirm
+            await waitFor(() => {
+                expect(onUseAbility).toHaveBeenCalledWith('p1', []);
+            }, { timeout: 200 });
         });
 
         it('should call onSkipAction when clicking skip button', () => {
