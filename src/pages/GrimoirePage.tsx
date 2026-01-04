@@ -25,8 +25,18 @@ export default function GrimoirePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
     const [searchParams] = useSearchParams();
     const role = searchParams.get('role') === 'storyteller' ? 'storyteller' : 'player';
+    const currentPlayerId = searchParams.get('playerId'); // 玩家视角时的当前玩家 ID
 
     const { session, participants, loading, error } = useGameSession(sessionId!);
+
+    // 数据过滤：玩家只能看到自己的角色，说书人能看到所有角色
+    const visibleParticipants = role === 'storyteller'
+        ? participants
+        : participants.map(p => ({
+            ...p,
+            // 只保留当前玩家自己的 character_id，其他人的都隐藏
+            character_id: p.id === currentPlayerId ? p.character_id : null
+        }));
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
     // UI Store
@@ -36,7 +46,7 @@ export default function GrimoirePage() {
     const [state, send] = useMachine(gameMachine, {
         context: {
             sessionId: sessionId || '',
-            players: participants.map(p => ({
+            players: visibleParticipants.map(p => ({
                 id: p.id,
                 name: p.name,
                 seatIndex: p.seat_index,
@@ -389,8 +399,8 @@ export default function GrimoirePage() {
             {/* 核心游戏区域 */}
             <div className="absolute inset-0 z-10">
                 <StageWrapper>
-                    <SeatingChart 
-                        participants={participants}
+                    <SeatingChart
+                        participants={visibleParticipants}
                         onPlayerSelect={setSelectedPlayerId}
                         selectedPlayerId={selectedPlayerId}
                         width={window.innerWidth}
@@ -425,7 +435,7 @@ export default function GrimoirePage() {
                             <div className="flex flex-col items-center gap-1">
                                 <span className="text-xs text-stone-500 tracking-widest uppercase">已选中</span>
                                 <span className="text-xl font-bold text-amber-100">
-                                    {participants.find(p => p.id === selectedPlayerId)?.name}
+                                    {visibleParticipants.find(p => p.id === selectedPlayerId)?.name}
                                 </span>
                             </div>
                             
