@@ -49,8 +49,15 @@ export function DayPhase({
     const currentNomineeId = machineState.context.currentNomineeId;
     const nominatedToday = machineState.context.nominatedToday || [];
     const nominatorsToday = machineState.context.nominatorsToday || [];
-    const votesFor = machineState.context.votesFor || [];
-    const votesAgainst = machineState.context.votesAgainst || [];
+    const currentVotes = machineState.context.currentVotes || {};
+
+    // 从currentVotes计算votesFor和votesAgainst
+    const votesFor = Object.entries(currentVotes)
+        .filter(([_, vote]) => vote === true)
+        .map(([voterId]) => voterId);
+    const votesAgainst = Object.entries(currentVotes)
+        .filter(([_, vote]) => vote === false)
+        .map(([voterId]) => voterId);
 
     // 判断当前阶段
     const isDiscussion = machineState.matches('gameLoop.day.discussion');

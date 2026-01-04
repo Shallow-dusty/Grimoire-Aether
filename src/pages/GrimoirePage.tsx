@@ -182,7 +182,7 @@ export default function GrimoirePage() {
     // 白天阶段处理
     const handleStartNomination = (nominatorId: string, nomineeId: string) => {
         if (role !== 'storyteller') return;
-        send({ type: 'START_NOMINATION', nominatorId, nomineeId });
+        send({ type: 'NOMINATE', nominatorId, nomineeId });
     };
 
     const handleCancelNomination = () => {
@@ -192,22 +192,22 @@ export default function GrimoirePage() {
 
     const handleVote = (voterId: string, voteFor: boolean) => {
         if (role !== 'storyteller') return;
-        send({ type: 'CAST_VOTE', voterId, voteFor });
+        send({ type: 'CAST_VOTE', voterId, vote: voteFor });
     };
 
     const handleEndVoting = () => {
         if (role !== 'storyteller') return;
-        send({ type: 'END_VOTING' });
+        send({ type: 'FINISH_VOTE' });
     };
 
     const handleConfirmExecution = () => {
         if (role !== 'storyteller') return;
-        send({ type: 'CONFIRM_EXECUTION' });
+        send({ type: 'EXECUTE' });
     };
 
     const handleContinueAfterVote = () => {
         if (role !== 'storyteller') return;
-        send({ type: 'CONTINUE_NOMINATIONS' });
+        send({ type: 'SKIP_EXECUTION' });
     };
 
     const handleEndDay = () => {
@@ -501,11 +501,11 @@ export default function GrimoirePage() {
                             id: state.context.currentNominatorId || '',
                             name: state.context.players.find(p => p.id === state.context.currentNominatorId)?.name || ''
                         }}
-                        votesFor={state.context.votesFor?.length || 0}
-                        votesAgainst={state.context.votesAgainst?.length || 0}
+                        votesFor={Object.values(state.context.currentVotes).filter(v => v === true).length}
+                        votesAgainst={Object.values(state.context.currentVotes).filter(v => v === false).length}
                         executionThreshold={Math.ceil(state.context.players.filter(p => !p.isDead).length / 2)}
                         willExecute={
-                            (state.context.votesFor?.length || 0) >=
+                            Object.values(state.context.currentVotes).filter(v => v === true).length >=
                             Math.ceil(state.context.players.filter(p => !p.isDead).length / 2)
                         }
                         onConfirmExecution={handleConfirmExecution}
