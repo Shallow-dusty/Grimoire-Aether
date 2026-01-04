@@ -370,3 +370,9 @@ export function countAlivePlayers(players: Player[]): number {
 export function getVotesRequired(aliveCount: number): number {
     return Math.ceil(aliveCount / 2);
 }
+
+/** 计算处决阈值（从玩家数组直接计算） */
+export function getExecutionThreshold(players: Player[]): number {
+    const aliveCount = countAlivePlayers(players);
+    return getVotesRequired(aliveCount);
+}

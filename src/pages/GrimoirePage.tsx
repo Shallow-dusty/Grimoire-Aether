@@ -8,7 +8,7 @@ import { SeatingChart } from '../components/game/board/SeatingChart';
 import { BackgroundEffect } from '../components/ui/layout/BackgroundEffect';
 import { Loader2, Moon, Sun, Shield, Sword, Skull, Crown, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { updateParticipant, supabase } from '../lib/supabase';
+import { updateParticipant, supabase, logGameAction, checkDailyNomination } from '../lib/supabase';
 import { ArcaneMenu } from '../components/game/ui/ArcaneMenu';
 import { PhaseIndicator } from '../components/ui/layout/PhaseIndicator';
 import { RoleAssignment } from '../components/game/phases/RoleAssignment';
@@ -21,6 +21,7 @@ import { GameOver } from '../components/game/phases/GameOver';
 import { GameInfo } from '../components/game/ui/GameInfo';
 import { useUIStore } from '../logic/stores/uiStore';
 import { PlayerRoleCard } from '../components/game/ui/PlayerRoleCard';
+import { getExecutionThreshold } from '../types/game';
 
 export default function GrimoirePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
@@ -199,9 +200,39 @@ export default function GrimoirePage() {
         send({ type: 'ENTER_NOMINATION' });
     };
 
-    const handleStartNomination = (nominatorId: string, nomineeId: string) => {
+    const handleStartNomination = async (nominatorId: string, nomineeId: string) => {
         if (role !== 'storyteller') return;
-        send({ type: 'NOMINATE', nominatorId, nomineeId });
+
+        try {
+            // 数据库级别验证：检查提名者今日是否已提名过
+            const canNominate = await checkDailyNomination(
+                sessionId!,
+                nominatorId,
+                state.context.currentDay
+            );
+
+            if (!canNominate) {
+                console.warn('提名验证失败：该玩家今日已提名过');
+                return;
+            }
+
+            // 发送状态机事件
+            send({ type: 'NOMINATE', nominatorId, nomineeId });
+
+            // 记录提名动作到数据库
+            await logGameAction(
+                sessionId!,
+                'NOMINATE',
+                {
+                    day: state.context.currentDay,
+                    nomineeId
+                },
+                nominatorId,
+                nomineeId
+            );
+        } catch (err) {
+            console.error('Failed to start nomination:', err);
+        }
     };
 
     const handleCancelNomination = () => {
@@ -533,10 +564,10 @@ export default function GrimoirePage() {
                         }}
                         votesFor={Object.values(state.context.currentVotes).filter(v => v === true).length}
                         votesAgainst={Object.values(state.context.currentVotes).filter(v => v === false).length}
-                        executionThreshold={Math.ceil(state.context.players.filter(p => !p.isDead).length / 2)}
+                        executionThreshold={getExecutionThreshold(state.context.players)}
                         willExecute={
                             Object.values(state.context.currentVotes).filter(v => v === true).length >=
-                            Math.ceil(state.context.players.filter(p => !p.isDead).length / 2)
+                            getExecutionThreshold(state.context.players)
                         }
                         onConfirmExecution={handleConfirmExecution}
                         onContinue={handleContinueAfterVote}

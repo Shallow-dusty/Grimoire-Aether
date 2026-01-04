@@ -231,6 +231,40 @@ export async function logGameAction(
   if (error) throw error;
 }
 
+/**
+ * 检查玩家今日是否已提名
+ *
+ * @param sessionId 游戏会话 ID
+ * @param nominatorId 提名者 ID
+ * @param currentDay 当前天数
+ * @returns true = 可以提名, false = 已提名过
+ */
+export async function checkDailyNomination(
+  sessionId: string,
+  nominatorId: string,
+  currentDay: number
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('game_actions')
+    .select('*')
+    .eq('session_id', sessionId)
+    .eq('actor_id', nominatorId)
+    .eq('action_type', 'NOMINATE');
+
+  if (error) {
+    console.error('Failed to check daily nomination:', error);
+    return false; // 查询失败时保守处理，不允许提名
+  }
+
+  // 过滤出当天的提名记录
+  const todayNominations = data.filter(action => {
+    const payload = action.payload as { day?: number } | null;
+    return payload?.day === currentDay;
+  });
+
+  return todayNominations.length === 0;
+}
+
 // ============================================================
 // Realtime 订阅
 // ============================================================
