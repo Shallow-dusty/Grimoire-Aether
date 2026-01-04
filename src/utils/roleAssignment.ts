@@ -25,9 +25,9 @@ export function randomAssignRoles(playerIds: PlayerId[]): Record<PlayerId, strin
     // 随机选择角色
     const selectedRoles: Character[] = [
         ...shuffleArray(townsfolk).slice(0, composition.townsfolk),
-        ...shuffleArray(outsiders).slice(0, composition.outsider),
-        ...shuffleArray(minions).slice(0, composition.minion),
-        ...shuffleArray(demons).slice(0, composition.demon)
+        ...shuffleArray(outsiders).slice(0, composition.outsiders),
+        ...shuffleArray(minions).slice(0, composition.minions),
+        ...shuffleArray(demons).slice(0, composition.demons)
     ];
 
     // 打乱角色顺序
@@ -99,17 +99,17 @@ export function balancedAssignRoles(playerIds: PlayerId[]): Record<PlayerId, str
 
     // 外来者
     const outsiders = TROUBLE_BREWING_CHARACTERS.filter(c => c.team === Team.OUTSIDER);
-    const selectedOutsiders = selectByPriority(outsiders, priorityOutsiders, composition.outsider);
+    const selectedOutsiders = selectByPriority(outsiders, priorityOutsiders, composition.outsiders);
     selectedRoles.push(...selectedOutsiders);
 
     // 爪牙
     const minions = TROUBLE_BREWING_CHARACTERS.filter(c => c.team === Team.MINION);
-    const selectedMinions = selectByPriority(minions, priorityMinions, composition.minion);
+    const selectedMinions = selectByPriority(minions, priorityMinions, composition.minions);
     selectedRoles.push(...selectedMinions);
 
     // 恶魔
     const demons = TROUBLE_BREWING_CHARACTERS.filter(c => c.team === Team.DEMON);
-    const selectedDemons = selectByPriority(demons, priorityDemons, composition.demon);
+    const selectedDemons = selectByPriority(demons, priorityDemons, composition.demons);
     selectedRoles.push(...selectedDemons);
 
     // 打乱顺序

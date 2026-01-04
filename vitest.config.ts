@@ -3,9 +3,10 @@ import path from 'path';
 
 export default defineConfig({
     test: {
-        globals: false,
-        environment: 'node',
-        include: ['src/**/*.{test,spec}.{ts,tsx}']
+        globals: true,
+        environment: 'happy-dom',
+        include: ['src/**/*.{test,spec}.{ts,tsx}'],
+        setupFiles: ['./src/test/setup.ts']
     },
     resolve: {
         alias: {

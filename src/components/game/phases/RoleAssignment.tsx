@@ -125,9 +125,9 @@ export function RoleAssignment({
                             <Users className="w-4 h-4 text-blue-400" />
                             <span className="text-stone-300">推荐配置:</span>
                             <span className="text-blue-300 font-bold">{recommendedComposition.townsfolk}镇民</span>
-                            <span className="text-cyan-300 font-bold">{recommendedComposition.outsider}外来</span>
-                            <span className="text-red-300 font-bold">{recommendedComposition.minion}爪牙</span>
-                            <span className="text-purple-300 font-bold">{recommendedComposition.demon}恶魔</span>
+                            <span className="text-cyan-300 font-bold">{recommendedComposition.outsiders}外来</span>
+                            <span className="text-red-300 font-bold">{recommendedComposition.minions}爪牙</span>
+                            <span className="text-purple-300 font-bold">{recommendedComposition.demons}恶魔</span>
                         </div>
                         <button
                             onClick={onClose}
@@ -153,7 +153,7 @@ export function RoleAssignment({
                             >
                                 全部 ({TROUBLE_BREWING_CHARACTERS.length})
                             </button>
-                            {Object.values(Team).map(team => (
+                            {[Team.TOWNSFOLK, Team.OUTSIDER, Team.MINION, Team.DEMON].map(team => (
                                 <button
                                     key={team}
                                     onClick={() => setSelectedTeam(team)}
@@ -207,14 +207,21 @@ export function RoleAssignment({
                         {/* 当前配置统计 */}
                         <div className="px-6 py-3 bg-stone-900/50 border-b border-white/10">
                             <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                                {Object.values(Team).map(team => (
-                                    <div key={team} className="flex flex-col">
-                                        <span className={teamColors[team].text}>
-                                            {assignedCount[team]}/{recommendedComposition[team === Team.TOWNSFOLK ? 'townsfolk' : team === Team.OUTSIDER ? 'outsider' : team === Team.MINION ? 'minion' : 'demon']}
-                                        </span>
-                                        <span className="text-stone-500">{teamColors[team].name}</span>
-                                    </div>
-                                ))}
+                                {[Team.TOWNSFOLK, Team.OUTSIDER, Team.MINION, Team.DEMON].map(team => {
+                                    const recommendedKey = team === Team.TOWNSFOLK ? 'townsfolk'
+                                        : team === Team.OUTSIDER ? 'outsiders'
+                                        : team === Team.MINION ? 'minions'
+                                        : 'demons';
+
+                                    return (
+                                        <div key={team} className="flex flex-col">
+                                            <span className={teamColors[team].text}>
+                                                {assignedCount[team]}/{recommendedComposition[recommendedKey]}
+                                            </span>
+                                            <span className="text-stone-500">{teamColors[team].name}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
