@@ -4,12 +4,14 @@
  * 显示夜晚行动队列，说书人执行角色能力
  */
 
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, ChevronRight, Check, SkipForward, Eye, EyeOff } from 'lucide-react';
 import { type NightQueue } from '../../../logic/night/nightActions';
 import { TROUBLE_BREWING_CHARACTERS } from '../../../data/characters/trouble-brewing';
 import { type PlayerId } from '../../../types/game';
 import { useUIStore } from '../../../logic/stores/uiStore';
+import { AbilityTargetSelector } from './AbilityTargetSelector';
 
 interface NightPhaseProps {
     nightQueue: NightQueue;
@@ -29,6 +31,7 @@ export function NightPhase({
     isStoryteller
 }: NightPhaseProps) {
     const { nightActionInProgress, setNightActionInProgress } = useUIStore();
+    const [showTargetSelector, setShowTargetSelector] = useState(false);
 
     const currentAction = nightQueue.actions[nightQueue.currentIndex];
     const isComplete = nightQueue.currentIndex >= nightQueue.actions.length;
@@ -43,12 +46,23 @@ export function NightPhase({
         ? players.find(p => p.id === currentAction.playerId)
         : null;
 
-    // 处理能力使用
-    const handleUseAbility = (targets?: PlayerId[]) => {
+    // 处理能力使用（打开目标选择器）
+    const handleUseAbilityClick = () => {
+        setShowTargetSelector(true);
+    };
+
+    // 处理目标选择确认
+    const handleTargetConfirm = (targets: PlayerId[]) => {
         if (!currentAction) return;
+        setShowTargetSelector(false);
         setNightActionInProgress(true);
         onUseAbility(currentAction.playerId, targets);
         setTimeout(() => setNightActionInProgress(false), 500);
+    };
+
+    // 处理目标选择取消
+    const handleTargetCancel = () => {
+        setShowTargetSelector(false);
     };
 
     return (
@@ -139,7 +153,7 @@ export function NightPhase({
                                     {isStoryteller && (
                                         <div className="flex gap-3">
                                             <button
-                                                onClick={() => handleUseAbility()}
+                                                onClick={handleUseAbilityClick}
                                                 disabled={nightActionInProgress}
                                                 className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/50 rounded-xl text-emerald-300 font-medium transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
@@ -254,6 +268,19 @@ export function NightPhase({
                     </div>
                 )}
             </motion.div>
+
+            {/* 能力目标选择器 */}
+            {currentAction && currentCharacter && currentPlayer && (
+                <AbilityTargetSelector
+                    characterId={currentAction.characterId}
+                    characterName={currentCharacter.name}
+                    players={players}
+                    actorId={currentAction.playerId}
+                    visible={showTargetSelector}
+                    onConfirm={handleTargetConfirm}
+                    onCancel={handleTargetCancel}
+                />
+            )}
         </div>
     );
 }

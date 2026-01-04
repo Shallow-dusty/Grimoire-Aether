@@ -20,8 +20,8 @@ export interface NightActionItem {
     characterId: CharacterId;
     /** 行动角色对象 */
     character: Character;
-    /** 执行行动的玩家 ID（可能为多个玩家） */
-    playerIds: PlayerId[];
+    /** 执行行动的玩家 ID */
+    playerId: PlayerId;
     /** 行动顺序 */
     order: number;
     /** 是否已完成 */
@@ -70,9 +70,9 @@ export function buildNightQueue(
     isFirstNight: boolean,
     night: number
 ): NightQueue {
-    const actionsMap = new Map<CharacterId, PlayerId[]>();
+    const actions: NightActionItem[] = [];
 
-    // 收集所有需要行动的玩家
+    // 收集所有需要行动的玩家，每个玩家创建一个独立的行动项
     players.forEach(player => {
         if (!player.characterId || player.isDead) return;
 
@@ -84,29 +84,16 @@ export function buildNightQueue(
         if (!shouldAct) return;
 
         // 检查是否中毒或醉酒（这些状态会在后续实现）
-        // if (player.status.poisoned || player.status.drunk) return;
-
-        // 添加到行动列表
-        if (!actionsMap.has(character.id)) {
-            actionsMap.set(character.id, []);
-        }
-        actionsMap.get(character.id)!.push(player.id);
-    });
-
-    // 构建行动项
-    const actions: NightActionItem[] = [];
-    actionsMap.forEach((playerIds, characterId) => {
-        const character = getCharacterById(characterId);
-        if (!character) return;
+        // if (player.statusFlags.poisoned || player.statusFlags.drunk) return;
 
         const order = isFirstNight
             ? character.firstNightOrder || 999
             : character.otherNightOrder || 999;
 
         actions.push({
-            characterId,
+            characterId: character.id,
             character,
-            playerIds,
+            playerId: player.id,
             order,
             completed: false
         });
