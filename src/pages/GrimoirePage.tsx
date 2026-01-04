@@ -20,6 +20,7 @@ import { ExecutionPhase } from '../components/game/phases/ExecutionPhase';
 import { GameOver } from '../components/game/phases/GameOver';
 import { GameInfo } from '../components/game/ui/GameInfo';
 import { useUIStore } from '../logic/stores/uiStore';
+import { PlayerRoleCard } from '../components/game/ui/PlayerRoleCard';
 
 export default function GrimoirePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
@@ -38,6 +39,9 @@ export default function GrimoirePage() {
             character_id: p.id === currentPlayerId ? p.character_id : null
         }));
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+
+    // 玩家角色卡片显示状态
+    const [showRoleCard, setShowRoleCard] = useState(false);
 
     // UI Store
     const { isSidebarOpen, setSidebarOpen, showRoles, toggleShowRoles } = useUIStore();
@@ -247,6 +251,16 @@ export default function GrimoirePage() {
         );
     }
 
+    // 处理玩家选择（点击令牌）
+    const handlePlayerSelect = (playerId: string) => {
+        setSelectedPlayerId(playerId);
+
+        // 如果是玩家视角且点击的是自己的令牌，显示角色卡片
+        if (role === 'player' && playerId === currentPlayerId) {
+            setShowRoleCard(true);
+        }
+    };
+
     // 处理座位变更
     const handleSeatChange = async (playerId: string, newSeatIndex: number) => {
         if (role !== 'storyteller') return;
@@ -401,7 +415,7 @@ export default function GrimoirePage() {
                 <StageWrapper>
                     <SeatingChart
                         participants={visibleParticipants}
-                        onPlayerSelect={setSelectedPlayerId}
+                        onPlayerSelect={handlePlayerSelect}
                         selectedPlayerId={selectedPlayerId}
                         width={window.innerWidth}
                         height={window.innerHeight}
@@ -560,6 +574,16 @@ export default function GrimoirePage() {
                 onToggleRoles={toggleShowRoles}
                 isStoryteller={role === 'storyteller'}
             />
+
+            {/* 玩家角色卡片（仅玩家视角） */}
+            {role === 'player' && currentPlayerId && (
+                <PlayerRoleCard
+                    visible={showRoleCard}
+                    characterId={visibleParticipants.find(p => p.id === currentPlayerId)?.character_id || null}
+                    playerName={visibleParticipants.find(p => p.id === currentPlayerId)?.name || ''}
+                    onClose={() => setShowRoleCard(false)}
+                />
+            )}
         </div>
     );
 }
