@@ -16,6 +16,7 @@ import { randomAssignRoles, balancedAssignRoles } from '../utils/roleAssignment'
 import { NightPhase } from '../components/game/phases/NightPhase';
 import { buildNightQueue } from '../logic/night/nightActions';
 import { DayPhase } from '../components/game/phases/DayPhase';
+import { ExecutionPhase } from '../components/game/phases/ExecutionPhase';
 import { GameOver } from '../components/game/phases/GameOver';
 import { GameInfo } from '../components/game/ui/GameInfo';
 import { useUIStore } from '../logic/stores/uiStore';
@@ -179,9 +180,34 @@ export default function GrimoirePage() {
     };
 
     // 白天阶段处理
-    const handleStartNomination = () => {
+    const handleStartNomination = (nominatorId: string, nomineeId: string) => {
         if (role !== 'storyteller') return;
-        send({ type: 'START_NOMINATION' });
+        send({ type: 'START_NOMINATION', nominatorId, nomineeId });
+    };
+
+    const handleCancelNomination = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'CANCEL_NOMINATION' });
+    };
+
+    const handleVote = (voterId: string, voteFor: boolean) => {
+        if (role !== 'storyteller') return;
+        send({ type: 'CAST_VOTE', voterId, voteFor });
+    };
+
+    const handleEndVoting = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'END_VOTING' });
+    };
+
+    const handleConfirmExecution = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'CONFIRM_EXECUTION' });
+    };
+
+    const handleContinueAfterVote = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'CONTINUE_NOMINATIONS' });
     };
 
     const handleEndDay = () => {
@@ -452,7 +478,38 @@ export default function GrimoirePage() {
                         machineState={state}
                         players={state.context.players}
                         onStartNomination={handleStartNomination}
+                        onCancelNomination={handleCancelNomination}
+                        onVote={handleVote}
+                        onEndVoting={handleEndVoting}
                         onEndDay={handleEndDay}
+                        isStoryteller={role === 'storyteller'}
+                        currentPlayerId={role === 'player' ? searchParams.get('playerId') || undefined : undefined}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* 处决阶段面板 */}
+            <AnimatePresence>
+                {state.matches('gameLoop.execution') && state.context.executionTarget && (
+                    <ExecutionPhase
+                        nominee={{
+                            id: state.context.executionTarget,
+                            name: state.context.players.find(p => p.id === state.context.executionTarget)?.name || '',
+                            characterId: state.context.players.find(p => p.id === state.context.executionTarget)?.characterId || ''
+                        }}
+                        nominator={{
+                            id: state.context.currentNominatorId || '',
+                            name: state.context.players.find(p => p.id === state.context.currentNominatorId)?.name || ''
+                        }}
+                        votesFor={state.context.votesFor?.length || 0}
+                        votesAgainst={state.context.votesAgainst?.length || 0}
+                        executionThreshold={Math.ceil(state.context.players.filter(p => !p.isDead).length / 2)}
+                        willExecute={
+                            (state.context.votesFor?.length || 0) >=
+                            Math.ceil(state.context.players.filter(p => !p.isDead).length / 2)
+                        }
+                        onConfirmExecution={handleConfirmExecution}
+                        onContinue={handleContinueAfterVote}
                         isStoryteller={role === 'storyteller'}
                     />
                 )}

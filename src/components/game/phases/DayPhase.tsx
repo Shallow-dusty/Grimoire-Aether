@@ -8,25 +8,54 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, MessageCircle, Users, Vote } from 'lucide-react';
 import { type GameMachineState } from '../../../logic/machines/gameMachine';
 import { type PlayerId } from '../../../types/game';
+import { NominationPanel } from '../ui/NominationPanel';
+import { VotingPanel } from '../ui/VotingPanel';
 
 interface DayPhaseProps {
     machineState: GameMachineState;
-    players: Array<{ id: PlayerId; name: string; isDead: boolean; hasUsedGhostVote: boolean }>;
-    onStartNomination: () => void;
+    players: Array<{
+        id: PlayerId;
+        name: string;
+        characterId: string;
+        isDead: boolean;
+        isGhost: boolean;
+        hasUsedGhostVote: boolean;
+    }>;
+    onStartNomination: (nominatorId: PlayerId, nomineeId: PlayerId) => void;
+    onCancelNomination: () => void;
+    onVote: (voterId: PlayerId, voteFor: boolean) => void;
+    onEndVoting: () => void;
     onEndDay: () => void;
     isStoryteller: boolean;
+    currentPlayerId?: PlayerId;
 }
 
 export function DayPhase({
     machineState,
     players,
     onStartNomination,
+    onCancelNomination,
+    onVote,
+    onEndVoting,
     onEndDay,
-    isStoryteller
+    isStoryteller,
+    currentPlayerId
 }: DayPhaseProps) {
     const currentDay = machineState.context.currentDay;
-    const isDiscussion = machineState.matches('gameLoop.day.discussion');
     const executedToday = machineState.context.executedToday;
+
+    // 从状态机获取提名投票信息
+    const currentNominatorId = machineState.context.currentNominatorId;
+    const currentNomineeId = machineState.context.currentNomineeId;
+    const nominatedToday = machineState.context.nominatedToday || [];
+    const nominatorsToday = machineState.context.nominatorsToday || [];
+    const votesFor = machineState.context.votesFor || [];
+    const votesAgainst = machineState.context.votesAgainst || [];
+
+    // 判断当前阶段
+    const isDiscussion = machineState.matches('gameLoop.day.discussion');
+    const isNominating = machineState.matches('gameLoop.day.nomination');
+    const isVoting = machineState.matches('gameLoop.day.voting');
 
     const alivePlayers = players.filter(p => !p.isDead);
     const deadPlayers = players.filter(p => p.isDead);
@@ -72,8 +101,9 @@ export function DayPhase({
                     </div>
                 </div>
 
-                {/* 讨论阶段 */}
+                {/* 阶段内容 */}
                 <AnimatePresence mode="wait">
+                    {/* 讨论阶段 */}
                     {isDiscussion && (
                         <motion.div
                             key="discussion"
@@ -114,26 +144,73 @@ export function DayPhase({
                             </div>
 
                             {/* 说书人控制 */}
-                            {isStoryteller && (
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={onStartNomination}
-                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/50 rounded-xl text-blue-300 font-medium transition-all hover:scale-105"
-                                    >
-                                        <Vote className="w-5 h-5" />
-                                        开始提名投票
-                                    </button>
-
-                                    {executedToday && (
-                                        <button
-                                            onClick={onEndDay}
-                                            className="px-6 py-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 rounded-xl text-amber-300 font-medium transition-all hover:scale-105"
-                                        >
-                                            结束白天
-                                        </button>
-                                    )}
-                                </div>
+                            {isStoryteller && !executedToday && (
+                                <button
+                                    onClick={() => {
+                                        // 触发状态机进入提名阶段
+                                        // 实际的提名选择在 NominationPanel 中完成
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/50 rounded-xl text-blue-300 font-medium transition-all hover:scale-105"
+                                >
+                                    <Vote className="w-5 h-5" />
+                                    进入提名阶段
+                                </button>
                             )}
+
+                            {isStoryteller && executedToday && (
+                                <button
+                                    onClick={onEndDay}
+                                    className="w-full px-6 py-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 rounded-xl text-amber-300 font-medium transition-all hover:scale-105"
+                                >
+                                    结束白天
+                                </button>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {/* 提名阶段 */}
+                    {isNominating && (
+                        <motion.div
+                            key="nomination"
+                            className="p-6"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                        >
+                            <NominationPanel
+                                players={players}
+                                nominatedToday={nominatedToday}
+                                nominatorsToday={nominatorsToday}
+                                currentNominatorId={currentNominatorId}
+                                currentNomineeId={currentNomineeId}
+                                onStartNomination={onStartNomination}
+                                onCancelNomination={onCancelNomination}
+                                isNominating={false}
+                                isStoryteller={isStoryteller}
+                            />
+                        </motion.div>
+                    )}
+
+                    {/* 投票阶段 */}
+                    {isVoting && currentNominatorId && currentNomineeId && (
+                        <motion.div
+                            key="voting"
+                            className="p-6"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                        >
+                            <VotingPanel
+                                players={players}
+                                nominatorId={currentNominatorId}
+                                nomineeId={currentNomineeId}
+                                votesFor={votesFor}
+                                votesAgainst={votesAgainst}
+                                onVote={onVote}
+                                onEndVoting={onEndVoting}
+                                isStoryteller={isStoryteller}
+                                currentPlayerId={currentPlayerId}
+                            />
                         </motion.div>
                     )}
                 </AnimatePresence>
