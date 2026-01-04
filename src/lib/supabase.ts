@@ -132,16 +132,26 @@ export async function updateGamePhase(sessionId: string, phase: string, day?: nu
 export async function addParticipant(
   sessionId: string,
   name: string,
-  seatIndex: number,
+  seatIndex?: number,
   userId?: string
 ) {
+  // 如果没有指定 seat_index，自动计算
+  let finalSeatIndex = seatIndex;
+  if (finalSeatIndex === undefined) {
+    const participants = await getGameParticipants(sessionId);
+    const maxSeatIndex = participants.length > 0
+      ? Math.max(...participants.map(p => p.seat_index))
+      : -1;
+    finalSeatIndex = maxSeatIndex + 1;
+  }
+
   const { data, error } = await supabase
     .from('game_participants')
     .insert({
       session_id: sessionId,
       user_id: userId,
       name,
-      seat_index: seatIndex
+      seat_index: finalSeatIndex
     })
     .select()
     .single();

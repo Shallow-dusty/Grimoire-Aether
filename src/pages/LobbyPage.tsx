@@ -41,11 +41,27 @@ export default function LobbyPage() {
             if (isStoryteller) {
                 // 传入 null 作为 storytellerId，因为我们没有 Auth
                 const session = await createGameSession(null, roomName || `${username}的魔典`);
+
+                // 添加示例玩家用于测试界面显示
+                const examplePlayers = [
+                    '艾莉丝',
+                    '布莱克',
+                    '凯瑟琳',
+                    '大卫',
+                    '伊芙琳',
+                    '弗兰克',
+                    '格蕾丝'
+                ];
+
+                for (const playerName of examplePlayers) {
+                    await addParticipant(session.id, playerName);
+                }
+
                 navigate(`/game/${session.id}?role=storyteller`);
             } else {
                 const session = await joinGameByCode(joinCode);
                 if (!session) throw new Error('虚空未响应... (房间不存在)');
-                await addParticipant(session.id, username, 999);
+                await addParticipant(session.id, username);
                 navigate(`/game/${session.id}`);
             }
         } catch (err) {
