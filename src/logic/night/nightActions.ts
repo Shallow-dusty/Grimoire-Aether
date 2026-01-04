@@ -390,7 +390,262 @@ registerAbilityHandler('fortune_teller', async (actorId, targetIds, context) => 
         data: {
             hasDemon,
             target1Id,
-            target2Id
+            target1Name: target1.name,
+            target2Id,
+            target2Name: target2.name
+        }
+    };
+});
+
+/**
+ * 调查员能力：首夜得知两名玩家和一个爪牙角色
+ */
+registerAbilityHandler('investigator', async (actorId, _targetIds, context) => {
+    const actor = context.players.find(p => p.id === actorId);
+    if (!actor) {
+        return {
+            actorId,
+            success: false,
+            error: '玩家不存在'
+        };
+    }
+
+    // 获取所有爪牙玩家
+    const minions = context.players.filter(p => {
+        if (!p.characterId || p.isDead) return false;
+        const char = getCharacterById(p.characterId);
+        return char?.team === Team.MINION;
+    });
+
+    // 如果没有爪牙，说书人需要提供虚假信息
+    const hasMinions = minions.length > 0;
+
+    return {
+        actorId,
+        success: true,
+        data: {
+            role: 'investigator',
+            hasMinions,
+            message: hasMinions
+                ? '说书人应向调查员提供：两名玩家中有一名是某个爪牙角色'
+                : '说书人应向调查员提供：两名玩家和一个爪牙角色（虚假信息）'
+        }
+    };
+});
+
+/**
+ * 图书管理员能力：首夜得知两名玩家和一个外来者角色
+ */
+registerAbilityHandler('librarian', async (actorId, _targetIds, context) => {
+    const actor = context.players.find(p => p.id === actorId);
+    if (!actor) {
+        return {
+            actorId,
+            success: false,
+            error: '玩家不存在'
+        };
+    }
+
+    // 获取所有外来者玩家
+    const outsiders = context.players.filter(p => {
+        if (!p.characterId || p.isDead) return false;
+        const char = getCharacterById(p.characterId);
+        return char?.team === Team.OUTSIDER;
+    });
+
+    const hasOutsiders = outsiders.length > 0;
+
+    return {
+        actorId,
+        success: true,
+        data: {
+            role: 'librarian',
+            hasOutsiders,
+            message: hasOutsiders
+                ? '说书人应向图书管理员提供：两名玩家中有一名是某个外来者角色'
+                : '说书人应向图书管理员提供：两名玩家和一个外来者角色（虚假信息）'
+        }
+    };
+});
+
+/**
+ * 洗衣妇能力：首夜得知两名玩家和一个镇民角色
+ */
+registerAbilityHandler('washerwoman', async (actorId, _targetIds, context) => {
+    const actor = context.players.find(p => p.id === actorId);
+    if (!actor) {
+        return {
+            actorId,
+            success: false,
+            error: '玩家不存在'
+        };
+    }
+
+    // 获取所有镇民玩家（排除自己）
+    const townsfolk = context.players.filter(p => {
+        if (!p.characterId || p.isDead || p.id === actorId) return false;
+        const char = getCharacterById(p.characterId);
+        return char?.team === Team.TOWNSFOLK;
+    });
+
+    return {
+        actorId,
+        success: true,
+        data: {
+            role: 'washerwoman',
+            availableTownsfolk: townsfolk.length,
+            message: '说书人应向洗衣妇提供：两名玩家中有一名是某个镇民角色'
+        }
+    };
+});
+
+/**
+ * 守鸦人能力：死亡当晚查看一名玩家的角色
+ */
+registerAbilityHandler('ravenkeeper', async (actorId, targetIds, context) => {
+    if (!targetIds || targetIds.length === 0) {
+        return {
+            actorId,
+            success: false,
+            error: '必须选择一名玩家'
+        };
+    }
+
+    const targetId = targetIds[0];
+    const target = context.players.find(p => p.id === targetId);
+
+    if (!target) {
+        return {
+            actorId,
+            success: false,
+            error: '目标玩家不存在'
+        };
+    }
+
+    const targetCharacter = target.characterId ? getCharacterById(target.characterId) : null;
+
+    return {
+        actorId,
+        targetIds,
+        success: true,
+        data: {
+            targetId,
+            targetName: target.name,
+            targetCharacterId: target.characterId,
+            targetCharacterName: targetCharacter?.name || '未知',
+            message: `守鸦人查看了 ${target.name}，其角色为 ${targetCharacter?.name || '未知'}`
+        }
+    };
+});
+
+/**
+ * 间谍能力：查看魔典（说书人展示所有信息）
+ */
+registerAbilityHandler('spy', async (actorId, _targetIds, context) => {
+    const actor = context.players.find(p => p.id === actorId);
+    if (!actor) {
+        return {
+            actorId,
+            success: false,
+            error: '玩家不存在'
+        };
+    }
+
+    // 收集所有玩家信息
+    const grimoireInfo = context.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        characterId: p.characterId,
+        characterName: p.characterId ? getCharacterById(p.characterId)?.name : '未分配',
+        isDead: p.isDead,
+        statusFlags: p.statusFlags
+    }));
+
+    return {
+        actorId,
+        success: true,
+        data: {
+            role: 'spy',
+            grimoireInfo,
+            message: '说书人应向间谍展示魔典中的所有信息'
+        }
+    };
+});
+
+/**
+ * 僧侣能力：每晚保护一名玩家（不能是自己）
+ */
+registerAbilityHandler('monk', async (actorId, targetIds, context) => {
+    if (!targetIds || targetIds.length === 0) {
+        return {
+            actorId,
+            success: false,
+            error: '必须选择一名玩家'
+        };
+    }
+
+    const targetId = targetIds[0];
+
+    if (targetId === actorId) {
+        return {
+            actorId,
+            success: false,
+            error: '僧侣不能保护自己'
+        };
+    }
+
+    const target = context.players.find(p => p.id === targetId);
+
+    if (!target) {
+        return {
+            actorId,
+            success: false,
+            error: '目标玩家不存在'
+        };
+    }
+
+    if (target.isDead) {
+        return {
+            actorId,
+            success: false,
+            error: '不能保护已死亡的玩家'
+        };
+    }
+
+    return {
+        actorId,
+        targetIds,
+        success: true,
+        data: {
+            protectedPlayerId: targetId,
+            protectedPlayerName: target.name,
+            message: `僧侣保护了 ${target.name}`
+        }
+    };
+});
+
+/**
+ * 殓葬师能力：得知前一天被处决玩家的角色
+ */
+registerAbilityHandler('undertaker', async (actorId, _targetIds, context) => {
+    const actor = context.players.find(p => p.id === actorId);
+    if (!actor) {
+        return {
+            actorId,
+            success: false,
+            error: '玩家不存在'
+        };
+    }
+
+    // TODO: 从游戏历史中获取昨天被处决的玩家
+    // 目前返回提示信息，实际数据需要从状态机上下文中获取
+
+    return {
+        actorId,
+        success: true,
+        data: {
+            role: 'undertaker',
+            message: '说书人应告知殓葬师：昨天被处决玩家的角色'
         }
     };
 });
