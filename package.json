@@ -13,7 +13,17 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "cf:login": "node scripts/cloudflare.mjs login",
+    "cf:logout": "node scripts/cloudflare.mjs logout",
+    "cf:status": "node scripts/cloudflare.mjs status",
+    "cf:deploy": "node scripts/cloudflare.mjs deploy",
+    "cf:logs": "node scripts/cloudflare.mjs logs",
+    "cf:list": "node scripts/cloudflare.mjs list",
+    "cf:tail": "node scripts/cloudflare.mjs tail",
+    "cf:info": "node scripts/cloudflare.mjs info",
+    "cf:env": "node scripts/cloudflare.mjs env",
+    "cf:help": "node scripts/cloudflare.mjs help"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.2",
