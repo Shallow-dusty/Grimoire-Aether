@@ -21,6 +21,7 @@ interface DayPhaseProps {
         isGhost: boolean;
         hasUsedGhostVote: boolean;
     }>;
+    onEnterNomination: () => void; // 新增：进入提名阶段
     onStartNomination: (nominatorId: PlayerId, nomineeId: PlayerId) => void;
     onCancelNomination: () => void;
     onVote: (voterId: PlayerId, voteFor: boolean) => void;
@@ -33,6 +34,7 @@ interface DayPhaseProps {
 export function DayPhase({
     machineState,
     players,
+    onEnterNomination, // 新增
     onStartNomination,
     onCancelNomination,
     onVote,
@@ -153,10 +155,7 @@ export function DayPhase({
                             {/* 说书人控制 */}
                             {isStoryteller && !executedToday && (
                                 <button
-                                    onClick={() => {
-                                        // 触发状态机进入提名阶段
-                                        // 实际的提名选择在 NominationPanel 中完成
-                                    }}
+                                    onClick={onEnterNomination}
                                     className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/50 rounded-xl text-blue-300 font-medium transition-all hover:scale-105"
                                 >
                                     <Vote className="w-5 h-5" />

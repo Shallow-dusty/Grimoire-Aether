@@ -180,6 +180,11 @@ export default function GrimoirePage() {
     };
 
     // 白天阶段处理
+    const handleEnterNomination = () => {
+        if (role !== 'storyteller') return;
+        send({ type: 'ENTER_NOMINATION' });
+    };
+
     const handleStartNomination = (nominatorId: string, nomineeId: string) => {
         if (role !== 'storyteller') return;
         send({ type: 'NOMINATE', nominatorId, nomineeId });
@@ -477,6 +482,7 @@ export default function GrimoirePage() {
                     <DayPhase
                         machineState={state}
                         players={state.context.players}
+                        onEnterNomination={handleEnterNomination}
                         onStartNomination={handleStartNomination}
                         onCancelNomination={handleCancelNomination}
                         onVote={handleVote}

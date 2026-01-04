@@ -90,6 +90,7 @@ export type GameMachineEvent =
     | { type: 'SKIP_NIGHT_ACTION' }
     | { type: 'END_NIGHT' }
     // 白天
+    | { type: 'ENTER_NOMINATION' } // 进入提名阶段（不需要参数）
     | { type: 'NOMINATE'; nominatorId: PlayerId; nomineeId: PlayerId }
     | { type: 'CANCEL_NOMINATION' }
     | { type: 'START_VOTE' }
@@ -666,10 +667,8 @@ export const gameMachine = setup({
                         // 讨论阶段
                         discussion: {
                             on: {
-                                NOMINATE: {
-                                    target: 'nomination',
-                                    guard: 'isValidNomination',
-                                    actions: 'setNomination'
+                                ENTER_NOMINATION: {
+                                    target: 'nomination'
                                 },
                                 END_DAY: {
                                     target: '#bloodOnTheClockTower.gameLoop.execution'
@@ -684,12 +683,13 @@ export const gameMachine = setup({
                         // 提名阶段
                         nomination: {
                             on: {
-                                START_VOTE: {
-                                    target: 'vote'
+                                NOMINATE: {
+                                    guard: 'isValidNomination',
+                                    actions: 'setNomination',
+                                    target: 'vote' // 直接进入投票
                                 },
                                 CANCEL_NOMINATION: {
-                                    target: 'discussion',
-                                    actions: 'clearNomination'
+                                    target: 'discussion'
                                 }
                             }
                         },
