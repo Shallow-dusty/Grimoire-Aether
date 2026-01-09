@@ -376,3 +376,57 @@ export function getExecutionThreshold(players: Player[]): number {
     const aliveCount = countAlivePlayers(players);
     return getVotesRequired(aliveCount);
 }
+
+// ============================================================
+// 游戏配置类型
+// ============================================================
+
+/**
+ * 错误信息模式（用于中毒/醉酒角色）
+ */
+export enum ErrorInfoMode {
+    /** 说书人自定义错误信息 */
+    CUSTOM = 'custom',
+    /** 完全随机错误信息 */
+    RANDOM = 'random',
+    /** 基于规则的错误信息 */
+    RULE_BASED = 'rule'
+}
+
+/**
+ * 红鲱鱼模式（占卜师误导）
+ */
+export enum RedHerringMode {
+    /** 游戏开始时随机选择 */
+    RANDOM = 'random',
+    /** 说书人手动指定 */
+    MANUAL = 'manual'
+}
+
+/**
+ * 游戏配置
+ */
+export interface GameConfig {
+    /** 错误信息模式 */
+    errorInfoMode: ErrorInfoMode;
+    /** 上次使用的错误信息模式 */
+    lastUsedMode?: ErrorInfoMode;
+    /** 红鲱鱼模式 */
+    redHerringMode: RedHerringMode;
+    /** 红鲱鱼玩家ID（手动模式） */
+    redHerringPlayerId?: PlayerId;
+}
+
+/**
+ * 处决记录（用于殓葬师）
+ */
+export interface ExecutionRecord {
+    /** 处决发生的天数 */
+    day: number;
+    /** 被处决玩家ID */
+    executedId: PlayerId;
+    /** 被处决玩家的角色ID */
+    executedCharacterId: CharacterId;
+    /** 提名者ID */
+    nominatorId: PlayerId;
+}

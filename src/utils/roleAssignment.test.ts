@@ -170,7 +170,7 @@ describe('roleAssignment', () => {
     });
 
     describe('composition consistency', () => {
-        it('random and balanced should follow same composition rules', () => {
+        it('random and balanced should follow valid composition rules (standard or baron-adjusted)', () => {
             const playerIds = Array.from({ length: 9 }, (_, i) => `p${i + 1}`);
 
             const randomAssignments = randomAssignRoles(playerIds);
@@ -179,7 +179,12 @@ describe('roleAssignment', () => {
             const randomCounts = { townsfolk: 0, outsiders: 0, minions: 0, demons: 0 };
             const balancedCounts = { townsfolk: 0, outsiders: 0, minions: 0, demons: 0 };
 
+            // 检查是否有男爵
+            let randomHasBaron = false;
+            let balancedHasBaron = false;
+
             Object.values(randomAssignments).forEach(charId => {
+                if (charId === 'baron') randomHasBaron = true;
                 const char = TROUBLE_BREWING_CHARACTERS.find(c => c.id === charId);
                 if (char) {
                     if (char.team === Team.TOWNSFOLK) randomCounts.townsfolk++;
@@ -190,6 +195,7 @@ describe('roleAssignment', () => {
             });
 
             Object.values(balancedAssignments).forEach(charId => {
+                if (charId === 'baron') balancedHasBaron = true;
                 const char = TROUBLE_BREWING_CHARACTERS.find(c => c.id === charId);
                 if (char) {
                     if (char.team === Team.TOWNSFOLK) balancedCounts.townsfolk++;
@@ -199,7 +205,23 @@ describe('roleAssignment', () => {
                 }
             });
 
-            expect(randomCounts).toEqual(balancedCounts);
+            // 验证组成：标准组成（7镇民0外来者）或男爵调整组成（5镇民2外来者）
+            const standardComposition = { townsfolk: 7, outsiders: 0, minions: 1, demons: 1 };
+            const baronComposition = { townsfolk: 5, outsiders: 2, minions: 1, demons: 1 };
+
+            // Random 应该符合标准或男爵组成
+            if (randomHasBaron) {
+                expect(randomCounts).toEqual(baronComposition);
+            } else {
+                expect(randomCounts).toEqual(standardComposition);
+            }
+
+            // Balanced 应该符合标准或男爵组成
+            if (balancedHasBaron) {
+                expect(balancedCounts).toEqual(baronComposition);
+            } else {
+                expect(balancedCounts).toEqual(standardComposition);
+            }
         });
     });
 

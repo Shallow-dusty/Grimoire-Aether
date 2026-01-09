@@ -14,7 +14,7 @@ import { Team, type Character, type PlayerId } from '../types/game';
  */
 export function randomAssignRoles(playerIds: PlayerId[]): Record<PlayerId, string> {
     const playerCount = playerIds.length;
-    const composition = getStandardComposition(playerCount);
+    let composition = getStandardComposition(playerCount);
 
     // 获取各阵营角色池
     const townsfolk = TROUBLE_BREWING_CHARACTERS.filter(c => c.team === Team.TOWNSFOLK);
@@ -22,11 +22,24 @@ export function randomAssignRoles(playerIds: PlayerId[]): Record<PlayerId, strin
     const minions = TROUBLE_BREWING_CHARACTERS.filter(c => c.team === Team.MINION);
     const demons = TROUBLE_BREWING_CHARACTERS.filter(c => c.team === Team.DEMON);
 
+    // 先随机选择爪牙，检查是否有男爵
+    const selectedMinions = shuffleArray(minions).slice(0, composition.minions);
+    const hasBaron = selectedMinions.some(m => m.id === 'baron');
+
+    // 如果有男爵，调整配置：+2外来者，-2镇民
+    if (hasBaron && composition.townsfolk >= 2) {
+        composition = {
+            ...composition,
+            townsfolk: composition.townsfolk - 2,
+            outsiders: composition.outsiders + 2
+        };
+    }
+
     // 随机选择角色
     const selectedRoles: Character[] = [
         ...shuffleArray(townsfolk).slice(0, composition.townsfolk),
         ...shuffleArray(outsiders).slice(0, composition.outsiders),
-        ...shuffleArray(minions).slice(0, composition.minions),
+        ...selectedMinions,
         ...shuffleArray(demons).slice(0, composition.demons)
     ];
 
@@ -52,7 +65,7 @@ export function randomAssignRoles(playerIds: PlayerId[]): Record<PlayerId, strin
  */
 export function balancedAssignRoles(playerIds: PlayerId[]): Record<PlayerId, string> {
     const playerCount = playerIds.length;
-    const composition = getStandardComposition(playerCount);
+    let composition = getStandardComposition(playerCount);
 
     // 优先级策略
     const priorityTownsfolk = [
@@ -89,6 +102,20 @@ export function balancedAssignRoles(playerIds: PlayerId[]): Record<PlayerId, str
         'imp'             // 小恶魔 - 标准恶魔
     ];
 
+    // 先选择爪牙，检查是否有男爵
+    const minions = TROUBLE_BREWING_CHARACTERS.filter(c => c.team === Team.MINION);
+    const selectedMinions = selectByPriority(minions, priorityMinions, composition.minions);
+    const hasBaron = selectedMinions.some(m => m.id === 'baron');
+
+    // 如果有男爵，调整配置：+2外来者，-2镇民
+    if (hasBaron && composition.townsfolk >= 2) {
+        composition = {
+            ...composition,
+            townsfolk: composition.townsfolk - 2,
+            outsiders: composition.outsiders + 2
+        };
+    }
+
     // 选择角色
     const selectedRoles: Character[] = [];
 
@@ -102,9 +129,7 @@ export function balancedAssignRoles(playerIds: PlayerId[]): Record<PlayerId, str
     const selectedOutsiders = selectByPriority(outsiders, priorityOutsiders, composition.outsiders);
     selectedRoles.push(...selectedOutsiders);
 
-    // 爪牙
-    const minions = TROUBLE_BREWING_CHARACTERS.filter(c => c.team === Team.MINION);
-    const selectedMinions = selectByPriority(minions, priorityMinions, composition.minions);
+    // 爪牙（已选择）
     selectedRoles.push(...selectedMinions);
 
     // 恶魔

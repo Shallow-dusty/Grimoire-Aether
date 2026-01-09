@@ -4,7 +4,7 @@
  * 负责管理夜晚阶段的角色行动顺序和能力触发
  */
 
-import type { Character, Player, PlayerId, CharacterId } from '../../types/game';
+import type { Character, Player, PlayerId, CharacterId, GameConfig, ExecutionRecord, ErrorInfoMode } from '../../types/game';
 import { Team } from '../../types/game';
 import { getCharacterById } from '../../data/characters/trouble-brewing';
 
@@ -180,6 +180,16 @@ export interface AbilityContext {
     isFirstNight: boolean;
     /** 游戏历史数据 */
     history?: unknown[];
+    /** 被保护的玩家ID集合（僧侣保护） */
+    protectedPlayers?: Set<PlayerId>;
+    /** 游戏配置 */
+    config?: GameConfig;
+    /** 说书人自定义的错误信息 */
+    customErrorInfo?: Record<PlayerId, any>;
+    /** 处决历史记录 */
+    executionHistory?: ExecutionRecord[];
+    /** 红鲱鱼玩家ID */
+    redHerringPlayerId?: PlayerId;
 }
 
 /**
@@ -195,6 +205,104 @@ export function registerAbilityHandler(
     handler: AbilityHandler
 ): void {
     abilityHandlers.set(characterId, handler);
+}
+
+// ============================================================
+// 中毒/醉酒系统
+// ============================================================
+
+/**
+ * 生成随机错误信息
+ */
+function generateRandomErrorInfo(result: AbilityResult): any {
+    if (!result.data) return {};
+
+    const data = { ...result.data };
+
+    // 共情者：随机0-2的邪恶邻居数
+    if (data.evilNeighborCount !== undefined) {
+        data.evilNeighborCount = Math.floor(Math.random() * 3);
+    }
+
+    // 占卜师：随机真假
+    if (data.hasDemon !== undefined) {
+        data.hasDemon = Math.random() < 0.5;
+    }
+
+    // 厨师：随机邪恶对数
+    if (data.evilPairs !== undefined) {
+        data.evilPairs = Math.floor(Math.random() * 3);
+    }
+
+    return data;
+}
+
+/**
+ * 应用基于规则的错误信息
+ */
+function applyErrorRules(result: AbilityResult): any {
+    if (!result.data) return {};
+
+    const data = { ...result.data };
+
+    // 共情者：显示相反数字
+    if (data.evilNeighborCount !== undefined) {
+        data.evilNeighborCount = 2 - data.evilNeighborCount;
+    }
+
+    // 占卜师：显示相反结果
+    if (data.hasDemon !== undefined) {
+        data.hasDemon = !data.hasDemon;
+    }
+
+    // 厨师：显示错误对数
+    if (data.evilPairs !== undefined) {
+        data.evilPairs = Math.max(0, data.evilPairs - 1);
+    }
+
+    return data;
+}
+
+/**
+ * 包装中毒/醉酒角色的能力，返回错误信息
+ */
+function wrapPoisonedAbility(
+    originalResult: AbilityResult,
+    actorId: PlayerId,
+    context: AbilityContext
+): AbilityResult {
+    const mode = context.config?.errorInfoMode;
+
+    // 如果没有配置，默认使用自定义模式
+    if (!mode) {
+        return originalResult;
+    }
+
+    switch (mode) {
+        case 'custom':
+            // 使用说书人提供的自定义信息
+            return {
+                ...originalResult,
+                data: context.customErrorInfo?.[actorId] || originalResult.data
+            };
+
+        case 'random':
+            // 生成随机错误信息
+            return {
+                ...originalResult,
+                data: generateRandomErrorInfo(originalResult)
+            };
+
+        case 'rule':
+            // 基于规则生成错误
+            return {
+                ...originalResult,
+                data: applyErrorRules(originalResult)
+            };
+
+        default:
+            return originalResult;
+    }
 }
 
 /**
@@ -219,7 +327,15 @@ export async function executeAbility(
     }
 
     try {
-        return await handler(actorId, targetIds, context);
+        const result = await handler(actorId, targetIds, context);
+
+        // 检查执行者是否中毒或醉酒
+        const actor = context.players.find(p => p.id === actorId);
+        if (actor && (actor.status.poisoned || actor.status.drunk)) {
+            return wrapPoisonedAbility(result, actorId, context);
+        }
+
+        return result;
     } catch (error) {
         return {
             actorId,
@@ -279,7 +395,17 @@ registerAbilityHandler('imp', async (actorId, targetIds, context) => {
     }
 
     // 检查目标是否被僧侣保护
-    // TODO: 这需要在状态机中维护保护状态
+    if (context.protectedPlayers?.has(targetId)) {
+        return {
+            actorId,
+            targetIds,
+            success: true,
+            data: {
+                killed: false,
+                reason: '目标被僧侣保护'
+            }
+        };
+    }
 
     return {
         actorId,
@@ -381,7 +507,12 @@ registerAbilityHandler('fortune_teller', async (actorId, targetIds, context) => 
         if (char2?.team === Team.DEMON) hasDemon = true;
     }
 
-    // TODO: 实现"红鲱鱼"机制（一名善良玩家始终被视为恶魔）
+    // 检查红鲱鱼（一名善良玩家始终被视为恶魔）
+    if (!hasDemon && context.redHerringPlayerId) {
+        if (target1Id === context.redHerringPlayerId || target2Id === context.redHerringPlayerId) {
+            hasDemon = true; // 红鲱鱼被误判为恶魔
+        }
+    }
 
     return {
         actorId,
@@ -389,6 +520,8 @@ registerAbilityHandler('fortune_teller', async (actorId, targetIds, context) => 
         success: true,
         data: {
             hasDemon,
+            isRedHerring: context.redHerringPlayerId &&
+                (target1Id === context.redHerringPlayerId || target2Id === context.redHerringPlayerId),
             target1Id,
             target1Name: target1.name,
             target2Id,
@@ -637,15 +770,139 @@ registerAbilityHandler('undertaker', async (actorId, _targetIds, context) => {
         };
     }
 
-    // TODO: 从游戏历史中获取昨天被处决的玩家
-    // 目前返回提示信息，实际数据需要从状态机上下文中获取
+    // 查找昨天被处决的玩家
+    // 殓葬师在夜晚行动，night表示当前夜晚，昨天白天对应的day = night
+    const yesterday = context.night;
+    const lastExecution = context.executionHistory?.find(
+        ex => ex.day === yesterday
+    );
+
+    if (!lastExecution) {
+        return {
+            actorId,
+            success: true,
+            data: {
+                hasExecution: false,
+                message: '昨天没有人被处决'
+            }
+        };
+    }
+
+    const executed = context.players.find(p => p.id === lastExecution.executedId);
+    const character = lastExecution.executedCharacterId
+        ? getCharacterById(lastExecution.executedCharacterId)
+        : null;
 
     return {
         actorId,
         success: true,
         data: {
-            role: 'undertaker',
-            message: '说书人应告知殓葬师：昨天被处决玩家的角色'
+            hasExecution: true,
+            executedPlayerId: lastExecution.executedId,
+            executedPlayerName: executed?.name,
+            characterId: lastExecution.executedCharacterId,
+            characterName: character?.name,
+            message: `昨天被处决的是 ${executed?.name}（${character?.name || '未知'}）`
+        }
+    };
+});
+
+/**
+ * 厨师能力：首夜获知邪恶玩家相邻的对数
+ */
+registerAbilityHandler('chef', async (actorId, _targetIds, context) => {
+    const actor = context.players.find(p => p.id === actorId);
+    if (!actor) {
+        return {
+            actorId,
+            success: false,
+            error: '玩家不存在'
+        };
+    }
+
+    // 计算相邻的邪恶玩家对数
+    let evilPairs = 0;
+    const players = context.players;
+
+    for (let i = 0; i < players.length; i++) {
+        const current = players[i];
+        const next = players[(i + 1) % players.length];
+
+        // 只计算活着的玩家
+        if (!current.isDead && !next.isDead && current.characterId && next.characterId) {
+            const currentChar = getCharacterById(current.characterId);
+            const nextChar = getCharacterById(next.characterId);
+
+            const currentEvil = currentChar &&
+                (currentChar.team === Team.MINION || currentChar.team === Team.DEMON);
+            const nextEvil = nextChar &&
+                (nextChar.team === Team.MINION || nextChar.team === Team.DEMON);
+
+            if (currentEvil && nextEvil) {
+                evilPairs++;
+            }
+        }
+    }
+
+    return {
+        actorId,
+        success: true,
+        data: {
+            evilPairs,
+            message: `厨师看到 ${evilPairs} 对邪恶玩家相邻`
+        }
+    };
+});
+
+/**
+ * 投毒者能力：夜晚投毒一名玩家，使其能力失效并获得错误信息
+ */
+registerAbilityHandler('poisoner', async (actorId, targetIds, context) => {
+    const actor = context.players.find(p => p.id === actorId);
+    if (!actor) {
+        return {
+            actorId,
+            success: false,
+            error: '玩家不存在'
+        };
+    }
+
+    if (!targetIds || targetIds.length === 0) {
+        return {
+            actorId,
+            success: false,
+            error: '必须选择一个目标'
+        };
+    }
+
+    const targetId = targetIds[0];
+    const target = context.players.find(p => p.id === targetId);
+
+    if (!target) {
+        return {
+            actorId,
+            success: false,
+            error: '目标玩家不存在'
+        };
+    }
+
+    if (target.isDead) {
+        return {
+            actorId,
+            success: false,
+            error: '目标玩家已死亡'
+        };
+    }
+
+    // 返回中毒标记，由状态机应用
+    return {
+        actorId,
+        targetIds,
+        success: true,
+        data: {
+            poisonedPlayerId: targetId,
+            poisonedPlayerName: target.name,
+            message: `投毒者毒害了 ${target.name}`
         }
     };
 });

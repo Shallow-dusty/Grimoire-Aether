@@ -30,6 +30,7 @@ import {
     checkGameEnd,
     checkScarletWomanTransform
 } from '../game/gameEnd';
+import { getCharacterById } from '../../data/characters/trouble-brewing';
 
 // ============================================================
 // 状态机上下文类型
@@ -125,7 +126,9 @@ export type GameMachineEvent =
     // 特殊
     | { type: 'KILL_PLAYER'; playerId: PlayerId; cause: string }
     | { type: 'REVIVE_PLAYER'; playerId: PlayerId }
-    | { type: 'TRANSFORM_SCARLET_WOMAN'; playerId: PlayerId };
+    | { type: 'TRANSFORM_SCARLET_WOMAN'; playerId: PlayerId }
+    // 杀手能力
+    | { type: 'SLAYER_ABILITY'; slayerId: PlayerId; targetId: PlayerId };
 
 // ============================================================
 // 辅助函数
@@ -680,6 +683,97 @@ export const gameMachine = setup({
                 );
                 return [...context.history, log];
             }
+        }),
+
+        // 触发处女能力（杀死提名者）
+        triggerVirginAbility: assign({
+            players: ({ context, event }) => {
+                assertEvent(event, 'NOMINATE');
+                return context.players.map(p => {
+                    // 标记处女能力已使用
+                    if (p.id === event.nomineeId) {
+                        return {
+                            ...p,
+                            status: {
+                                ...p.status,
+                                customMarkers: [...p.status.customMarkers, 'virgin_used']
+                            }
+                        };
+                    }
+                    // 杀死提名者
+                    if (p.id === event.nominatorId) {
+                        return { ...p, isDead: true, isGhost: true };
+                    }
+                    return p;
+                });
+            },
+            aliveCount: ({ context }) => countAlivePlayers(context.players) - 1,
+            history: ({ context, event }) => {
+                assertEvent(event, 'NOMINATE');
+                const nominator = context.players.find(p => p.id === event.nominatorId);
+                const nominee = context.players.find(p => p.id === event.nomineeId);
+                const log = createLogEntry(
+                    LogType.DEATH,
+                    `${nominator?.name} 提名了处女 ${nominee?.name}，作为镇民被处女能力处决！`,
+                    context,
+                    { playerId: event.nominatorId }
+                );
+                return [...context.history, log];
+            }
+        }),
+
+        // 使用杀手能力
+        useSlayerAbility: assign({
+            players: ({ context, event }) => {
+                assertEvent(event, 'SLAYER_ABILITY');
+                const target = context.players.find(p => p.id === event.targetId);
+                const targetChar = target?.characterId ? getCharacterById(target.characterId) : null;
+                const isDemon = targetChar?.team === Team.DEMON;
+
+                return context.players.map(p => {
+                    // 标记杀手能力已使用
+                    if (p.id === event.slayerId) {
+                        return {
+                            ...p,
+                            status: {
+                                ...p.status,
+                                customMarkers: [...p.status.customMarkers, 'slayer_used']
+                            }
+                        };
+                    }
+                    // 如果目标是恶魔，杀死目标
+                    if (p.id === event.targetId && isDemon) {
+                        return { ...p, isDead: true, isGhost: true };
+                    }
+                    return p;
+                });
+            },
+            aliveCount: ({ context, event }) => {
+                assertEvent(event, 'SLAYER_ABILITY');
+                const target = context.players.find(p => p.id === event.targetId);
+                const targetChar = target?.characterId ? getCharacterById(target.characterId) : null;
+                const isDemon = targetChar?.team === Team.DEMON;
+                return isDemon ? countAlivePlayers(context.players) - 1 : countAlivePlayers(context.players);
+            },
+            history: ({ context, event }) => {
+                assertEvent(event, 'SLAYER_ABILITY');
+                const slayer = context.players.find(p => p.id === event.slayerId);
+                const target = context.players.find(p => p.id === event.targetId);
+                const targetChar = target?.characterId ? getCharacterById(target.characterId) : null;
+                const isDemon = targetChar?.team === Team.DEMON;
+
+                const message = isDemon
+                    ? `杀手 ${slayer?.name} 成功杀死了恶魔 ${target?.name}！`
+                    : `杀手 ${slayer?.name} 尝试杀死 ${target?.name}，但什么也没发生`;
+
+                const log = createLogEntry(
+                    isDemon ? LogType.DEATH : LogType.CUSTOM,
+                    message,
+                    context,
+                    { playerId: event.targetId }
+                );
+                return [...context.history, log];
+            }
         })
     },
 
@@ -743,6 +837,41 @@ export const gameMachine = setup({
         shouldTransformScarletWoman: ({ context }) => {
             const result = checkScarletWomanTransform(context.players);
             return result.shouldTransform;
+        },
+        // 处女能力是否触发（被提名且提名者是镇民）
+        shouldTriggerVirgin: ({ context, event }) => {
+            assertEvent(event, 'NOMINATE');
+            const nominee = context.players.find(p => p.id === event.nomineeId);
+            const nominator = context.players.find(p => p.id === event.nominatorId);
+
+            if (!nominee || !nominator) return false;
+
+            // 被提名者必须是处女且能力未使用
+            if (nominee.characterId !== 'virgin') return false;
+            if (nominee.status.customMarkers.includes('virgin_used')) return false;
+
+            // 提名者必须是镇民
+            if (!nominator.characterId) return false;
+            const nominatorChar = getCharacterById(nominator.characterId);
+            if (!nominatorChar || nominatorChar.team !== Team.TOWNSFOLK) return false;
+
+            return true;
+        },
+        // 杀手能力是否有效
+        isValidSlayerAbility: ({ context, event }) => {
+            assertEvent(event, 'SLAYER_ABILITY');
+            const slayer = context.players.find(p => p.id === event.slayerId);
+            const target = context.players.find(p => p.id === event.targetId);
+
+            // 杀手必须存在、存活、是杀手角色、能力未使用
+            if (!slayer || slayer.isDead) return false;
+            if (slayer.characterId !== 'slayer') return false;
+            if (slayer.status.customMarkers.includes('slayer_used')) return false;
+
+            // 目标必须存在且存活
+            if (!target || target.isDead) return false;
+
+            return true;
         }
     }
 }).createMachine({
@@ -896,6 +1025,11 @@ export const gameMachine = setup({
                                 END_GAME: {
                                     target: '#bloodOnTheClockTower.gameOver',
                                     actions: 'setGameEnd'
+                                },
+                                // 杀手能力（白天使用）
+                                SLAYER_ABILITY: {
+                                    guard: 'isValidSlayerAbility',
+                                    actions: 'useSlayerAbility'
                                 }
                             }
                         },
@@ -904,6 +1038,12 @@ export const gameMachine = setup({
                         nomination: {
                             on: {
                                 NOMINATE: [
+                                    {
+                                        // 处女能力触发：提名者是镇民，立即死亡
+                                        guard: and(['isValidNomination', 'shouldTriggerVirgin']),
+                                        actions: 'triggerVirginAbility',
+                                        target: 'discussion'
+                                    },
                                     {
                                         // 如果启用时针投票，进入 clockwiseVote
                                         guard: and(['isValidNomination', ({ context }) => context.useClockwiseVoting]),
