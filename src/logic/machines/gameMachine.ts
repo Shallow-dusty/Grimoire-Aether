@@ -320,14 +320,29 @@ export const gameMachine = setup({
         }),
 
         // 记录投票
-        recordVote: assign({
-            currentVotes: ({ context, event }) => {
-                assertEvent(event, 'CAST_VOTE');
+        recordVote: assign(({ context, event }) => {
+            assertEvent(event, 'CAST_VOTE');
+            const voter = context.players.find(p => p.id === event.voterId);
+
+            // 更新投票记录
+            const currentVotes = {
+                ...context.currentVotes,
+                [event.voterId]: event.vote
+            };
+
+            // 如果是幽灵投票，标记为已使用
+            if (voter && voter.isGhost && !voter.hasUsedGhostVote) {
                 return {
-                    ...context.currentVotes,
-                    [event.voterId]: event.vote
+                    currentVotes,
+                    players: context.players.map(p =>
+                        p.id === event.voterId
+                            ? { ...p, hasUsedGhostVote: true }
+                            : p
+                    )
                 };
             }
+
+            return { currentVotes };
         }),
 
         // 计算投票结果
@@ -411,22 +426,16 @@ export const gameMachine = setup({
                 // 按座位顺序排序
                 const sortedVoters = [...eligibleVoters].sort((a, b) => a.seatIndex - b.seatIndex);
 
-                // 找到提名者的座位索引
-                const nominatorSeatIndex = nominator.seatIndex;
+                // 找到提名者在可投票玩家中的索引
+                const nominatorIndexInVoters = sortedVoters.findIndex(p => p.id === nominator.id);
 
-                // 从提名者的下一位开始生成投票顺序
+                // 从提名者的下一位开始，顺时针排列投票顺序
                 const voteOrder: PlayerId[] = [];
                 for (let i = 0; i < sortedVoters.length; i++) {
-                    const index = (nominatorSeatIndex + 1 + i) % sortedVoters.length;
-                    const voter = sortedVoters.find(p => p.seatIndex === (eligibleVoters[0].seatIndex + index) % context.players.length);
-                    if (voter && eligibleVoters.some(v => v.id === voter.id)) {
-                        voteOrder.push(voter.id);
-                    }
-                }
-
-                // 如果没有生成顺序，fallback 到所有可投票玩家
-                if (voteOrder.length === 0) {
-                    voteOrder.push(...eligibleVoters.map(p => p.id));
+                    // 如果提名者在可投票列表中，从其下一位开始；否则从第一位开始
+                    const startIndex = nominatorIndexInVoters >= 0 ? nominatorIndexInVoters + 1 : 0;
+                    const voterIndex = (startIndex + i) % sortedVoters.length;
+                    voteOrder.push(sortedVoters[voterIndex].id);
                 }
 
                 // 初始化投票记录
@@ -444,19 +453,33 @@ export const gameMachine = setup({
         }),
 
         // 记录时针投票
-        recordClockwiseVote: assign({
-            clockwiseVoting: ({ context, event }) => {
-                assertEvent(event, 'CLOCKWISE_VOTE');
-                if (!context.clockwiseVoting) return null;
+        recordClockwiseVote: assign(({ context, event }) => {
+            assertEvent(event, 'CLOCKWISE_VOTE');
+            if (!context.clockwiseVoting) return {};
 
+            const voter = context.players.find(p => p.id === event.voterId);
+
+            const updatedClockwiseVoting = {
+                ...context.clockwiseVoting,
+                votes: {
+                    ...context.clockwiseVoting.votes,
+                    [event.voterId]: event.vote
+                }
+            };
+
+            // 如果是幽灵投票，标记为已使用
+            if (voter && voter.isGhost && !voter.hasUsedGhostVote) {
                 return {
-                    ...context.clockwiseVoting,
-                    votes: {
-                        ...context.clockwiseVoting.votes,
-                        [event.voterId]: event.vote
-                    }
+                    clockwiseVoting: updatedClockwiseVoting,
+                    players: context.players.map(p =>
+                        p.id === event.voterId
+                            ? { ...p, hasUsedGhostVote: true }
+                            : p
+                    )
                 };
             }
+
+            return { clockwiseVoting: updatedClockwiseVoting };
         }),
 
         // 前进到下一位投票者
@@ -675,8 +698,8 @@ export const gameMachine = setup({
             const nominator = context.players.find(p => p.id === event.nominatorId);
             const nominee = context.players.find(p => p.id === event.nomineeId);
 
-            // 提名者必须存活且今日未提名过
-            if (!nominator || nominator.isDead) return false;
+            // 提名者必须存在且今日未提名过（活人和幽灵都可以提名）
+            if (!nominator) return false;
             if (context.nominatorsToday.includes(event.nominatorId)) return false;
 
             // 被提名者必须存活且今日未被提名过
@@ -760,13 +783,16 @@ export const gameMachine = setup({
         CHECK_GAME_END: {
             target: '.gameOver',
             guard: 'shouldCheckGameEnd',
-            actions: ({ context }) => {
+            actions: assign(({ context }) => {
                 const result = checkGameEnd(context.players, context.executedToday, context.executionTarget || undefined);
                 if (result.isEnded && result.winner && result.reason) {
-                    // 这会在 setGameEnd action 中处理
-                    return { type: 'END_GAME', winner: result.winner, reason: result.reason };
+                    return {
+                        winner: result.winner,
+                        endReason: result.reason
+                    };
                 }
-            }
+                return {};
+            })
         },
         // KILL_PLAYER 可以从任何状态触发（说书人随时可以杀死玩家）
         KILL_PLAYER: {
@@ -833,13 +859,16 @@ export const gameMachine = setup({
                             {
                                 target: '#bloodOnTheClockTower.gameOver',
                                 guard: 'shouldCheckGameEnd',
-                                actions: ({ context }) => {
+                                actions: assign(({ context }) => {
                                     const result = checkGameEnd(context.players, context.executedToday);
                                     if (result.isEnded && result.winner && result.reason) {
-                                        // 触发游戏结束
-                                        return { type: 'END_GAME', winner: result.winner, reason: result.reason };
+                                        return {
+                                            winner: result.winner,
+                                            endReason: result.reason
+                                        };
                                     }
-                                }
+                                    return {};
+                                })
                             }
                         ],
                         END_GAME: {
@@ -960,12 +989,16 @@ export const gameMachine = setup({
                                 },
                                 actions: [
                                     'executePlayer',
-                                    ({ context }) => {
+                                    assign(({ context }) => {
                                         const result = checkGameEnd(context.players, true, context.executionTarget || undefined);
                                         if (result.isEnded && result.winner && result.reason) {
-                                            return { type: 'END_GAME', winner: result.winner, reason: result.reason };
+                                            return {
+                                                winner: result.winner,
+                                                endReason: result.reason
+                                            };
                                         }
-                                    }
+                                        return {};
+                                    })
                                 ]
                             },
                             {
@@ -986,15 +1019,28 @@ export const gameMachine = setup({
                                 },
                                 actions: [
                                     'executePlayer',
-                                    ({ context }) => {
+                                    assign(({ context }) => {
                                         const scarletResult = checkScarletWomanTransform(context.players);
                                         if (scarletResult.shouldTransform && scarletResult.scarletWomanId) {
+                                            // 直接在这里转换猩红女郎
                                             return {
-                                                type: 'TRANSFORM_SCARLET_WOMAN',
-                                                playerId: scarletResult.scarletWomanId
+                                                players: context.players.map(p =>
+                                                    p.id === scarletResult.scarletWomanId
+                                                        ? { ...p, characterId: 'imp' as CharacterId }
+                                                        : p
+                                                ),
+                                                history: [...context.history, {
+                                                    id: generateId(),
+                                                    type: LogType.CUSTOM,
+                                                    message: `${context.players.find(p => p.id === scarletResult.scarletWomanId)?.name} (猩红女郎) 变成了小恶魔！`,
+                                                    timestamp: Date.now(),
+                                                    day: context.currentDay,
+                                                    phase: Phase.EXECUTION
+                                                }]
                                             };
                                         }
-                                    }
+                                        return {};
+                                    })
                                 ]
                             },
                             {

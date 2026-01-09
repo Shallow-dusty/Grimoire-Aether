@@ -10,6 +10,7 @@ import {
     checkSaintExecution,
     checkMayorWin,
     checkScarletWomanTransform,
+    checkSpecialWinConditions,
     getAliveGoodPlayers,
     getAliveEvilPlayers,
     getAliveDemons,
@@ -392,6 +393,80 @@ describe('Game End Detection', () => {
 
             expect(summary.status).toContain('善良占优');
             expect(summary.balance.goodPercentage).toBeGreaterThan(70);
+        });
+
+        it('邪恶占优时应该显示危急状态（邪恶超50%触发危险）', () => {
+            // 杀死大部分善良玩家，使邪恶占优
+            // 由于邪恶比例>=50%会触发危险状态，所以显示"局势危急"
+            const moreEvil = players.map((p, i) => {
+                // 保留 1 善良 (p2)，杀死其余善良 (p1, p3, p4, p5)
+                if (i === 0 || (i >= 2 && i < 5)) {
+                    return { ...p, isDead: true };
+                }
+                return p;
+            });
+
+            const summary = getGameStatusSummary(moreEvil);
+            // 1 善良 vs 2 邪恶 = 33%/67%
+            expect(summary.balance.evilPercentage).toBeGreaterThan(summary.balance.goodPercentage);
+            // 由于 evilPercentage >= 50%，触发危险状态
+            expect(summary.status).toBe('局势危急');
+            expect(summary.danger.inDanger).toBe(true);
+        });
+    });
+
+    describe('Special Win Conditions', () => {
+        it('市长胜利条件应该在未处决时检查', () => {
+            const threePlayers = players.map((p, i) =>
+                i >= 3 ? { ...p, isDead: true } : p
+            );
+            threePlayers[0] = { ...threePlayers[0], characterId: 'mayor' };
+
+            const result = checkSpecialWinConditions(threePlayers, {
+                currentDay: 1,
+                executedToday: false
+            });
+
+            expect(result.isEnded).toBe(true);
+            expect(result.winner).toBe(Team.TOWNSFOLK);
+        });
+
+        it('已处决时不应该检查市长胜利', () => {
+            const threePlayers = players.map((p, i) =>
+                i >= 3 ? { ...p, isDead: true } : p
+            );
+            threePlayers[0] = { ...threePlayers[0], characterId: 'mayor' };
+
+            const result = checkSpecialWinConditions(threePlayers, {
+                currentDay: 1,
+                executedToday: true
+            });
+
+            // 如果已经处决，不检查市长胜利
+            expect(result.isEnded).toBe(false);
+        });
+
+        it('圣徒被处决应该触发邪恶胜利', () => {
+            const withSaint = [...players];
+            withSaint[0] = { ...withSaint[0], characterId: 'saint' };
+
+            const result = checkSpecialWinConditions(withSaint, {
+                currentDay: 1,
+                executedToday: true,
+                lastExecutedId: 'p1'
+            });
+
+            expect(result.isEnded).toBe(true);
+            expect(result.winner).toBe(Team.DEMON);
+        });
+
+        it('无特殊条件时应该返回未结束', () => {
+            const result = checkSpecialWinConditions(players, {
+                currentDay: 1,
+                executedToday: false
+            });
+
+            expect(result.isEnded).toBe(false);
         });
     });
 });

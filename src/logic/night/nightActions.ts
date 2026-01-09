@@ -667,8 +667,9 @@ export function getNeighbors(player: Player, players: Player[]): {
     const leftIndex = (seatIndex - 1 + playerCount) % playerCount;
     const rightIndex = (seatIndex + 1) % playerCount;
 
-    const left = players.find(p => p.seatIndex === leftIndex && !p.isDead) || null;
-    const right = players.find(p => p.seatIndex === rightIndex && !p.isDead) || null;
+    // 返回所有邻居，包括死亡的（用于共情者等角色）
+    const left = players.find(p => p.seatIndex === leftIndex) || null;
+    const right = players.find(p => p.seatIndex === rightIndex) || null;
 
     return { left, right };
 }

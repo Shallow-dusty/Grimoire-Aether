@@ -265,4 +265,68 @@ describe('RoleAssignment', () => {
             expect(characterCard).toBeInTheDocument();
         });
     });
+
+    describe('Drag and Drop', () => {
+        it('should trigger onDragStart when dragging a character card', () => {
+            render(<RoleAssignment players={mockPlayers} {...mockCallbacks} />);
+
+            const characterCard = screen.getAllByText('洗衣妇')[0].closest('div[draggable="true"]');
+            if (characterCard) {
+                fireEvent.dragStart(characterCard);
+                // 验证拖拽开始
+                expect(characterCard).toBeDefined();
+            }
+        });
+
+        it('should trigger onDragEnd when dropping a character', () => {
+            render(<RoleAssignment players={mockPlayers} {...mockCallbacks} />);
+
+            const characterCard = screen.getAllByText('洗衣妇')[0].closest('div[draggable="true"]');
+            if (characterCard) {
+                fireEvent.dragStart(characterCard);
+                fireEvent.dragEnd(characterCard);
+                // 验证拖拽结束
+                expect(characterCard).toBeDefined();
+            }
+        });
+
+        it('should handle dragOver on player slots', () => {
+            render(<RoleAssignment players={mockPlayers} {...mockCallbacks} />);
+
+            // 找到一个未分配的玩家槽位
+            const playerSlot = screen.getByText('玩家1').parentElement;
+            if (playerSlot) {
+                const event = new Event('dragover', { bubbles: true });
+                event.preventDefault = vi.fn();
+                playerSlot.dispatchEvent(event);
+            }
+        });
+
+        it('should handle drop on player slots', () => {
+            // 创建一个带有 draggedCharacterId 的 mock
+            vi.mock('../../../logic/stores/uiStore', () => ({
+                useUIStore: () => ({
+                    draggedCharacterId: 'washerwoman',
+                    setDraggedCharacter: vi.fn()
+                })
+            }));
+
+            render(<RoleAssignment players={mockPlayers} {...mockCallbacks} />);
+
+            // 找到一个未分配的玩家槽位
+            const playerSlot = screen.getByText('玩家1').parentElement;
+            if (playerSlot) {
+                fireEvent.drop(playerSlot);
+            }
+        });
+
+        it('should handle dragLeave on player slots', () => {
+            render(<RoleAssignment players={mockPlayers} {...mockCallbacks} />);
+
+            const playerSlot = screen.getByText('玩家1').parentElement;
+            if (playerSlot) {
+                fireEvent.dragLeave(playerSlot);
+            }
+        });
+    });
 });

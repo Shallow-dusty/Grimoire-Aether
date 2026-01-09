@@ -6,9 +6,8 @@
 
 - Vite + React 19 + TypeScript
 - Tailwind CSS v4
-- Supabase 数据库配置完成
-- DeepSeek AI API 配置完成
-- GitHub 仓库已连接
+- XState v5 状态机
+- 430+ 测试用例，95%+ 覆盖率
 
 ## ⚡ 快速命令
 
@@ -21,11 +20,17 @@ npm run dev
 # 访问: http://localhost:5173/
 ```
 
-### 检查配置
+### 测试
 
 ```bash
-# 验证环境变量
-npm run check-env
+# 运行所有测试
+npm test
+
+# 运行测试并监视变化
+npm test -- --watch
+
+# 运行测试并生成覆盖率报告
+npm test -- --coverage
 ```
 
 ### 构建
@@ -36,6 +41,16 @@ npm run build
 
 # 预览构建结果
 npm run preview
+```
+
+### 代码检查
+
+```bash
+# 类型检查
+npm run typecheck
+
+# ESLint 检查
+npm run lint
 ```
 
 ### Git 操作

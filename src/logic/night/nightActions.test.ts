@@ -203,7 +203,7 @@ describe('Night Action System', () => {
             expect(neighbors.right?.seatIndex).toBe(0); // 第一个玩家
         });
 
-        it('应该跳过死亡的邻居', () => {
+        it('应该返回所有邻居（包括死亡的）', () => {
             const playersWithDead = players.map((p, i) =>
                 i === 1 ? { ...p, isDead: true } : p
             );
@@ -211,8 +211,9 @@ describe('Night Action System', () => {
             const player = playersWithDead[2];
             const neighbors = getNeighbors(player, playersWithDead);
 
-            // 左邻居应该跳过死亡的玩家2
-            expect(neighbors.left?.seatIndex).not.toBe(1);
+            // 应该返回左邻居（即使已死亡），用于共情者等角色
+            expect(neighbors.left?.seatIndex).toBe(1);
+            expect(neighbors.left?.isDead).toBe(true);
         });
     });
 
@@ -315,6 +316,434 @@ describe('Night Action System', () => {
 
             expect(result.success).toBe(false);
             expect(result.error).toBe('Test error');
+        });
+    });
+
+    // ============================================================
+    // 角色能力处理器详细测试
+    // ============================================================
+
+    describe('Imp 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 2,
+            isFirstNight: false
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '小恶魔', 0), characterId: 'imp' },
+                { ...createPlayer('p2', '村民', 1), characterId: 'washerwoman' },
+                { ...createPlayer('p3', '士兵', 2), characterId: 'soldier' },
+                { ...createPlayer('p4', '死亡者', 3), characterId: 'empath', isDead: true }
+            ];
+        });
+
+        it('应该成功杀死目标', async () => {
+            const result = await executeAbility('imp', 'p1', ['p2'], context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.killed).toBe(true);
+            expect(result.data?.victimId).toBe('p2');
+        });
+
+        it('没有目标应该失败', async () => {
+            const result = await executeAbility('imp', 'p1', [], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('目标');
+        });
+
+        it('目标不存在应该失败', async () => {
+            const result = await executeAbility('imp', 'p1', ['non_existent'], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('不存在');
+        });
+
+        it('目标已死亡应该失败', async () => {
+            const result = await executeAbility('imp', 'p1', ['p4'], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('已死亡');
+        });
+
+        it('士兵应该免疫攻击', async () => {
+            const result = await executeAbility('imp', 'p1', ['p3'], context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.killed).toBe(false);
+            expect(result.data?.reason).toContain('士兵');
+        });
+    });
+
+    describe('Empath 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 1,
+            isFirstNight: true
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '共情者', 0), characterId: 'empath' },
+                { ...createPlayer('p2', '中毒者', 1), characterId: 'poisoner' },  // 邪恶
+                { ...createPlayer('p3', '村民', 2), characterId: 'washerwoman' },
+                { ...createPlayer('p4', '小恶魔', 3), characterId: 'imp' },  // 邪恶
+                { ...createPlayer('p5', '僧侣', 4), characterId: 'monk' },
+                { ...createPlayer('p6', '士兵', 5), characterId: 'soldier' },
+            ];
+        });
+
+        it('应该正确检测邻居中的邪恶玩家数量', async () => {
+            const result = await executeAbility('empath', 'p1', undefined, context);
+
+            expect(result.success).toBe(true);
+            // p1 的邻居是 p6(士兵-善良) 和 p2(中毒者-邪恶)
+            expect(result.data?.evilNeighborCount).toBe(1);
+        });
+
+        it('两边都是邪恶时应该返回2', async () => {
+            // 修改玩家位置使共情者两边都是邪恶
+            context.players = [
+                { ...createPlayer('p1', '中毒者', 0), characterId: 'poisoner' },  // 邪恶
+                { ...createPlayer('p2', '共情者', 1), characterId: 'empath' },
+                { ...createPlayer('p3', '小恶魔', 2), characterId: 'imp' },  // 邪恶
+            ];
+
+            const result = await executeAbility('empath', 'p2', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.evilNeighborCount).toBe(2);
+        });
+
+        it('两边都是善良时应该返回0', async () => {
+            context.players = [
+                { ...createPlayer('p1', '村民1', 0), characterId: 'washerwoman' },
+                { ...createPlayer('p2', '共情者', 1), characterId: 'empath' },
+                { ...createPlayer('p3', '村民2', 2), characterId: 'librarian' },
+            ];
+
+            const result = await executeAbility('empath', 'p2', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.evilNeighborCount).toBe(0);
+        });
+
+        it('玩家不存在应该失败', async () => {
+            const result = await executeAbility('empath', 'non_existent', undefined, context);
+
+            expect(result.success).toBe(false);
+        });
+    });
+
+    describe('Fortune Teller 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 1,
+            isFirstNight: true
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '占卜师', 0), characterId: 'fortune_teller' },
+                { ...createPlayer('p2', '村民', 1), characterId: 'washerwoman' },
+                { ...createPlayer('p3', '小恶魔', 2), characterId: 'imp' },
+            ];
+        });
+
+        it('选择两个善良玩家应该返回无恶魔', async () => {
+            // 添加第二个善良玩家
+            context.players.push({ ...createPlayer('p4', '村民2', 3), characterId: 'librarian' });
+
+            const result = await executeAbility('fortune_teller', 'p1', ['p2', 'p4'], context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.hasDemon).toBe(false);
+        });
+
+        it('选择包含恶魔的玩家应该返回有恶魔', async () => {
+            const result = await executeAbility('fortune_teller', 'p1', ['p2', 'p3'], context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.hasDemon).toBe(true);
+        });
+
+        it('选择不够两个玩家应该失败', async () => {
+            const result = await executeAbility('fortune_teller', 'p1', ['p2'], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('两名玩家');
+        });
+
+        it('目标玩家不存在应该失败', async () => {
+            const result = await executeAbility('fortune_teller', 'p1', ['p2', 'non_existent'], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('不存在');
+        });
+    });
+
+    describe('Monk 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 2,
+            isFirstNight: false
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '僧侣', 0), characterId: 'monk' },
+                { ...createPlayer('p2', '村民', 1), characterId: 'washerwoman' },
+                { ...createPlayer('p3', '死亡者', 2), characterId: 'empath', isDead: true }
+            ];
+        });
+
+        it('应该成功保护目标玩家', async () => {
+            const result = await executeAbility('monk', 'p1', ['p2'], context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.protectedPlayerId).toBe('p2');
+        });
+
+        it('不能保护自己', async () => {
+            const result = await executeAbility('monk', 'p1', ['p1'], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('不能保护自己');
+        });
+
+        it('没有选择目标应该失败', async () => {
+            const result = await executeAbility('monk', 'p1', [], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('必须选择');
+        });
+
+        it('不能保护已死亡的玩家', async () => {
+            const result = await executeAbility('monk', 'p1', ['p3'], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('已死亡');
+        });
+    });
+
+    describe('Ravenkeeper 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 2,
+            isFirstNight: false
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '守鸦人', 0), characterId: 'ravenkeeper' },
+                { ...createPlayer('p2', '小恶魔', 1), characterId: 'imp' }
+            ];
+        });
+
+        it('应该成功查看目标玩家角色', async () => {
+            const result = await executeAbility('ravenkeeper', 'p1', ['p2'], context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.targetCharacterId).toBe('imp');
+        });
+
+        it('没有选择目标应该失败', async () => {
+            const result = await executeAbility('ravenkeeper', 'p1', [], context);
+
+            expect(result.success).toBe(false);
+        });
+
+        it('目标不存在应该失败', async () => {
+            const result = await executeAbility('ravenkeeper', 'p1', ['non_existent'], context);
+
+            expect(result.success).toBe(false);
+        });
+    });
+
+    describe('Spy 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 1,
+            isFirstNight: true
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '间谍', 0), characterId: 'spy' },
+                { ...createPlayer('p2', '村民', 1), characterId: 'washerwoman' },
+                { ...createPlayer('p3', '小恶魔', 2), characterId: 'imp' }
+            ];
+        });
+
+        it('应该返回所有玩家信息', async () => {
+            const result = await executeAbility('spy', 'p1', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.grimoireInfo).toHaveLength(3);
+            expect(result.data?.grimoireInfo[0].characterId).toBe('spy');
+            expect(result.data?.grimoireInfo[1].characterId).toBe('washerwoman');
+            expect(result.data?.grimoireInfo[2].characterId).toBe('imp');
+        });
+    });
+
+    describe('Investigator 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 1,
+            isFirstNight: true
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '调查员', 0), characterId: 'investigator' },
+                { ...createPlayer('p2', '中毒者', 1), characterId: 'poisoner' },  // 爪牙
+                { ...createPlayer('p3', '村民', 2), characterId: 'washerwoman' }
+            ];
+        });
+
+        it('存在爪牙时应该返回正确信息', async () => {
+            const result = await executeAbility('investigator', 'p1', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.hasMinions).toBe(true);
+        });
+
+        it('没有爪牙时应该返回虚假信息提示', async () => {
+            context.players = [
+                { ...createPlayer('p1', '调查员', 0), characterId: 'investigator' },
+                { ...createPlayer('p2', '村民', 1), characterId: 'washerwoman' }
+            ];
+
+            const result = await executeAbility('investigator', 'p1', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.hasMinions).toBe(false);
+        });
+    });
+
+    describe('Librarian 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 1,
+            isFirstNight: true
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '图书管理员', 0), characterId: 'librarian' },
+                { ...createPlayer('p2', '酒鬼', 1), characterId: 'drunk' },  // 外来者
+                { ...createPlayer('p3', '村民', 2), characterId: 'washerwoman' }
+            ];
+        });
+
+        it('存在外来者时应该返回正确信息', async () => {
+            const result = await executeAbility('librarian', 'p1', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.hasOutsiders).toBe(true);
+        });
+
+        it('没有外来者时应该返回虚假信息提示', async () => {
+            context.players = [
+                { ...createPlayer('p1', '图书管理员', 0), characterId: 'librarian' },
+                { ...createPlayer('p2', '村民', 1), characterId: 'washerwoman' }
+            ];
+
+            const result = await executeAbility('librarian', 'p1', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.hasOutsiders).toBe(false);
+        });
+    });
+
+    describe('Washerwoman 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 1,
+            isFirstNight: true
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '洗衣妇', 0), characterId: 'washerwoman' },
+                { ...createPlayer('p2', '共情者', 1), characterId: 'empath' },  // 镇民
+                { ...createPlayer('p3', '酒鬼', 2), characterId: 'drunk' }  // 外来者
+            ];
+        });
+
+        it('应该返回可用的镇民数量', async () => {
+            const result = await executeAbility('washerwoman', 'p1', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.availableTownsfolk).toBe(1);  // empath（不包括自己）
+        });
+    });
+
+    describe('Undertaker 能力处理器', () => {
+        const context: AbilityContext = {
+            players: [],
+            night: 2,
+            isFirstNight: false
+        };
+
+        beforeEach(() => {
+            context.players = [
+                { ...createPlayer('p1', '殓葬师', 0), characterId: 'undertaker' }
+            ];
+        });
+
+        it('应该成功执行并返回提示信息', async () => {
+            const result = await executeAbility('undertaker', 'p1', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.role).toBe('undertaker');
+        });
+    });
+
+    // ============================================================
+    // 边界情况和特殊场景测试
+    // ============================================================
+
+    describe('边界情况', () => {
+        it('所有玩家都没有角色ID时应该返回空队列', () => {
+            const playersWithoutCharacters = [
+                { ...createPlayer('p1', '玩家1', 0), characterId: null },
+                { ...createPlayer('p2', '玩家2', 1), characterId: null }
+            ];
+
+            const queue = buildNightQueue(playersWithoutCharacters, true, 0);
+            expect(queue.actions).toHaveLength(0);
+        });
+
+        it('所有玩家都死亡时应该返回空队列', () => {
+            const deadPlayers = players.map(p => ({ ...p, isDead: true }));
+            const queue = buildNightQueue(deadPlayers, true, 0);
+            expect(queue.actions).toHaveLength(0);
+        });
+
+        it('只有一个玩家时邻居应该是自己', () => {
+            const singlePlayer = [{ ...createPlayer('p1', '玩家1', 0), characterId: 'empath' }];
+            const neighbors = getNeighbors(singlePlayer[0], singlePlayer);
+
+            expect(neighbors.left?.id).toBe('p1');
+            expect(neighbors.right?.id).toBe('p1');
+        });
+
+        it('两个玩家时邻居应该互为左右', () => {
+            const twoPlayers = [
+                { ...createPlayer('p1', '玩家1', 0), characterId: 'empath' },
+                { ...createPlayer('p2', '玩家2', 1), characterId: 'washerwoman' }
+            ];
+
+            const neighbors1 = getNeighbors(twoPlayers[0], twoPlayers);
+            expect(neighbors1.left?.id).toBe('p2');
+            expect(neighbors1.right?.id).toBe('p2');
+
+            const neighbors2 = getNeighbors(twoPlayers[1], twoPlayers);
+            expect(neighbors2.left?.id).toBe('p1');
+            expect(neighbors2.right?.id).toBe('p1');
         });
     });
 });

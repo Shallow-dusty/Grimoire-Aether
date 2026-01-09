@@ -267,4 +267,63 @@ describe('DayPhase', () => {
             expect(screen.getByText(/第 10 天/)).toBeInTheDocument();
         });
     });
+
+    describe('Voting Phase - 投票阶段', () => {
+        it('should handle votes correctly', () => {
+            enterDayPhase();
+            actor.send({ type: 'ENTER_NOMINATION' });
+            const stateAfterNom = actor.getSnapshot();
+            const players = stateAfterNom.context.players;
+
+            // 进行提名
+            actor.send({ type: 'NOMINATE', nominatorId: players[0].id, nomineeId: players[1].id });
+
+            // 投票
+            actor.send({ type: 'CAST_VOTE', voterId: players[0].id, vote: true });
+            actor.send({ type: 'CAST_VOTE', voterId: players[2].id, vote: true });
+            actor.send({ type: 'CAST_VOTE', voterId: players[3].id, vote: false });
+
+            const state = actor.getSnapshot();
+
+            render(
+                <DayPhase
+                    machineState={state}
+                    players={getPlayers(state)}
+                    isStoryteller={true}
+                    {...mockCallbacks}
+                />
+            );
+
+            // 应该显示投票面板
+            expect(screen.getByTestId('voting-panel')).toBeInTheDocument();
+        });
+
+        it('should count votes for and against', () => {
+            enterDayPhase();
+            actor.send({ type: 'ENTER_NOMINATION' });
+            const stateAfterNom = actor.getSnapshot();
+            const players = stateAfterNom.context.players;
+
+            // 进行提名和投票
+            actor.send({ type: 'NOMINATE', nominatorId: players[0].id, nomineeId: players[1].id });
+            actor.send({ type: 'CAST_VOTE', voterId: players[0].id, vote: true });
+            actor.send({ type: 'CAST_VOTE', voterId: players[2].id, vote: true });
+            actor.send({ type: 'CAST_VOTE', voterId: players[3].id, vote: false });
+            actor.send({ type: 'CAST_VOTE', voterId: players[4].id, vote: false });
+
+            const state = actor.getSnapshot();
+
+            // 验证投票数据
+            const currentVotes = state.context.currentVotes || {};
+            const votesFor = Object.entries(currentVotes)
+                .filter(([_, vote]) => vote === true)
+                .map(([voterId]) => voterId);
+            const votesAgainst = Object.entries(currentVotes)
+                .filter(([_, vote]) => vote === false)
+                .map(([voterId]) => voterId);
+
+            expect(votesFor.length).toBe(2);
+            expect(votesAgainst.length).toBe(2);
+        });
+    });
 });
