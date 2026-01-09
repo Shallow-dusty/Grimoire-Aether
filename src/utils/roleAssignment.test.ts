@@ -25,14 +25,15 @@ describe('roleAssignment', () => {
             expect(Object.keys(assignments).length).toBe(15);
         });
 
-        it('should follow standard composition for 7 players', () => {
+        it('should follow valid composition for 7 players (standard or baron-adjusted)', () => {
             const playerIds = Array.from({ length: 7 }, (_, i) => `p${i + 1}`);
             const assignments = randomAssignRoles(playerIds);
-            const composition = getStandardComposition(7);
 
-            // 统计各阵营数量
+            // 统计各阵营数量并检查是否有男爵
             const counts = { townsfolk: 0, outsiders: 0, minions: 0, demons: 0 };
+            let hasBaron = false;
             Object.values(assignments).forEach(charId => {
+                if (charId === 'baron') hasBaron = true;
                 const char = TROUBLE_BREWING_CHARACTERS.find(c => c.id === charId);
                 if (char) {
                     if (char.team === Team.TOWNSFOLK) counts.townsfolk++;
@@ -42,10 +43,16 @@ describe('roleAssignment', () => {
                 }
             });
 
-            expect(counts.townsfolk).toBe(composition.townsfolk);
-            expect(counts.outsiders).toBe(composition.outsiders);
-            expect(counts.minions).toBe(composition.minions);
-            expect(counts.demons).toBe(composition.demons);
+            // 男爵会修改组成：+2外来者，-2镇民
+            if (hasBaron) {
+                expect(counts.townsfolk).toBe(3); // 5 - 2 = 3
+                expect(counts.outsiders).toBe(2); // 0 + 2 = 2
+            } else {
+                expect(counts.townsfolk).toBe(5);
+                expect(counts.outsiders).toBe(0);
+            }
+            expect(counts.minions).toBe(1);
+            expect(counts.demons).toBe(1);
         });
 
         it('should assign unique roles (no duplicates)', () => {
@@ -90,13 +97,14 @@ describe('roleAssignment', () => {
             expect(Object.keys(assignments).length).toBe(5);
         });
 
-        it('should follow standard composition for 7 players', () => {
+        it('should follow valid composition for 7 players (standard or baron-adjusted)', () => {
             const playerIds = Array.from({ length: 7 }, (_, i) => `p${i + 1}`);
             const assignments = balancedAssignRoles(playerIds);
-            const composition = getStandardComposition(7);
 
             const counts = { townsfolk: 0, outsiders: 0, minions: 0, demons: 0 };
+            let hasBaron = false;
             Object.values(assignments).forEach(charId => {
+                if (charId === 'baron') hasBaron = true;
                 const char = TROUBLE_BREWING_CHARACTERS.find(c => c.id === charId);
                 if (char) {
                     if (char.team === Team.TOWNSFOLK) counts.townsfolk++;
@@ -106,10 +114,16 @@ describe('roleAssignment', () => {
                 }
             });
 
-            expect(counts.townsfolk).toBe(composition.townsfolk);
-            expect(counts.outsiders).toBe(composition.outsiders);
-            expect(counts.minions).toBe(composition.minions);
-            expect(counts.demons).toBe(composition.demons);
+            // 男爵会修改组成：+2外来者，-2镇民
+            if (hasBaron) {
+                expect(counts.townsfolk).toBe(3); // 5 - 2 = 3
+                expect(counts.outsiders).toBe(2); // 0 + 2 = 2
+            } else {
+                expect(counts.townsfolk).toBe(5);
+                expect(counts.outsiders).toBe(0);
+            }
+            expect(counts.minions).toBe(1);
+            expect(counts.demons).toBe(1);
         });
 
         it('should prioritize information roles (fortune_teller, empath)', () => {
