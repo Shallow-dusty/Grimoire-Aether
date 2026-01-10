@@ -1407,4 +1407,87 @@ describe('Night Action System', () => {
             expect(result.data?.target2Id).toBe('empath');
         });
     });
+
+    describe('Butler (管家) 能力', () => {
+        let context: AbilityContext;
+
+        beforeEach(() => {
+            context = {
+                players: [
+                    { ...createPlayer('butler', '管家', 0), characterId: 'butler' },
+                    { ...createPlayer('master1', '主人1', 1), characterId: 'washerwoman' },
+                    { ...createPlayer('master2', '主人2', 2), characterId: 'empath' }
+                ],
+                night: 1,
+                isFirstNight: false
+            };
+        });
+
+        it('管家应该能选择一名玩家作为主人', async () => {
+            const result = await executeAbility('butler', 'butler', ['master1'], context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.butlerMasterId).toBe('master1');
+            expect(result.data?.butlerMasterName).toBe('主人1');
+        });
+
+        it('管家不能选择自己作为主人', async () => {
+            const result = await executeAbility('butler', 'butler', ['butler'], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('不能选择自己');
+        });
+
+        it('管家必须选择一个目标', async () => {
+            const result = await executeAbility('butler', 'butler', [], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('必须选择');
+        });
+
+        it('管家不能选择不存在的玩家', async () => {
+            const result = await executeAbility('butler', 'butler', ['nonexistent'], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('不存在');
+        });
+
+        it('管家不能选择已死亡的玩家作为主人', async () => {
+            context.players[1] = { ...context.players[1], isDead: true };
+
+            const result = await executeAbility('butler', 'butler', ['master1'], context);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('已死亡');
+        });
+    });
+
+    describe('Recluse (隐士) 能力', () => {
+        let context: AbilityContext;
+
+        beforeEach(() => {
+            context = {
+                players: [
+                    { ...createPlayer('recluse', '隐士', 0), characterId: 'recluse' }
+                ],
+                night: 1,
+                isFirstNight: false
+            };
+        });
+
+        it('隐士能力应该返回说书人提示', async () => {
+            const result = await executeAbility('recluse', 'recluse', undefined, context);
+
+            expect(result.success).toBe(true);
+            expect(result.data?.role).toBe('recluse');
+            expect(result.data?.message).toContain('可能被');
+            expect(result.data?.message).toContain('邪恶');
+        });
+
+        it('隐士能力不需要目标', async () => {
+            const result = await executeAbility('recluse', 'recluse', [], context);
+
+            expect(result.success).toBe(true);
+        });
+    });
 });

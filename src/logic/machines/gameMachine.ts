@@ -84,6 +84,8 @@ export interface GameContext {
         /** 投票记录（null 表示未投票） */
         votes: Record<PlayerId, boolean | null>;
     } | null;
+    /** 管家的主人记录（管家ID -> 主人ID） */
+    butlerMasters: Record<PlayerId, PlayerId>;
 }
 
 // ============================================================
@@ -235,6 +237,8 @@ export const gameMachine = setup({
                 const isFirst = context.currentNight === 0;
                 return buildNightQueue(context.players, isFirst, context.currentNight + 1);
             },
+            // 清除管家主人记录（每晚重新选择）
+            butlerMasters: () => ({}),
             history: ({ context }) => {
                 const nightNum = context.currentNight + 1;
                 const log = createLogEntry(
@@ -808,6 +812,18 @@ export const gameMachine = setup({
             const player = context.players.find(p => p.id === event.voterId);
             if (!player) return false;
 
+            // 检查是否是管家且需要等待主人投票
+            if (player.characterId === 'butler') {
+                const masterId = context.butlerMasters[player.id];
+                if (masterId) {
+                    // 检查主人是否已投票
+                    const masterVoted = context.currentVotes[masterId] !== undefined;
+                    if (!masterVoted) {
+                        return false; // 主人还没投票，管家不能投票
+                    }
+                }
+            }
+
             // 存活玩家可以投票
             if (!player.isDead) return true;
 
@@ -897,7 +913,8 @@ export const gameMachine = setup({
         winner: null,
         endReason: null,
         useClockwiseVoting: false,
-        clockwiseVoting: null
+        clockwiseVoting: null,
+        butlerMasters: {}
     },
 
     initial: 'setup',
@@ -969,7 +986,26 @@ export const gameMachine = setup({
                         },
                         USE_ABILITY: {
                             // 使用角色能力（由UI调用）
-                            actions: 'proceedNightAction'
+                            actions: [
+                                'proceedNightAction',
+                                // 处理管家能力：保存主人选择
+                                assign(({ context, event }) => {
+                                    assertEvent(event, 'USE_ABILITY');
+                                    const actor = context.players.find(p => p.id === event.actorId);
+
+                                    // 如果是管家且有目标，保存主人
+                                    if (actor?.characterId === 'butler' && event.targetIds && event.targetIds.length > 0) {
+                                        return {
+                                            butlerMasters: {
+                                                ...context.butlerMasters,
+                                                [event.actorId]: event.targetIds[0]
+                                            }
+                                        };
+                                    }
+
+                                    return {};
+                                })
+                            ]
                         },
                         SKIP_NIGHT_ACTION: {
                             actions: 'proceedNightAction'

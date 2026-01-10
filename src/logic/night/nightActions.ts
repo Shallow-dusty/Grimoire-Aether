@@ -855,6 +855,84 @@ registerAbilityHandler('chef', async (actorId, _targetIds, context) => {
 });
 
 /**
+ * 管家能力：选择主人，明天只能在主人投票后投票
+ */
+registerAbilityHandler('butler', async (actorId, targetIds, context) => {
+    if (!targetIds || targetIds.length === 0) {
+        return {
+            actorId,
+            success: false,
+            error: '必须选择一名玩家作为主人'
+        };
+    }
+
+    const targetId = targetIds[0];
+
+    if (targetId === actorId) {
+        return {
+            actorId,
+            success: false,
+            error: '管家不能选择自己作为主人'
+        };
+    }
+
+    const target = context.players.find(p => p.id === targetId);
+
+    if (!target) {
+        return {
+            actorId,
+            success: false,
+            error: '目标玩家不存在'
+        };
+    }
+
+    if (target.isDead) {
+        return {
+            actorId,
+            success: false,
+            error: '不能选择已死亡的玩家作为主人'
+        };
+    }
+
+    // 返回主人信息，由状态机保存
+    return {
+        actorId,
+        targetIds,
+        success: true,
+        data: {
+            butlerMasterId: targetId,
+            butlerMasterName: target.name,
+            message: `管家选择了 ${target.name} 作为今天的主人`
+        }
+    };
+});
+
+/**
+ * 隐士能力：可能被视为邪恶（被动能力，由说书人决定）
+ * 注：隐士没有主动能力，但其他角色的能力可能将隐士视为邪恶
+ * 这个处理器主要用于提示说书人
+ */
+registerAbilityHandler('recluse', async (actorId, _targetIds, context) => {
+    const actor = context.players.find(p => p.id === actorId);
+    if (!actor) {
+        return {
+            actorId,
+            success: false,
+            error: '玩家不存在'
+        };
+    }
+
+    return {
+        actorId,
+        success: true,
+        data: {
+            role: 'recluse',
+            message: '隐士可能被其他角色的能力视为邪恶、爪牙或恶魔（说书人决定）'
+        }
+    };
+});
+
+/**
  * 投毒者能力：夜晚投毒一名玩家，使其能力失效并获得错误信息
  */
 registerAbilityHandler('poisoner', async (actorId, targetIds, context) => {
