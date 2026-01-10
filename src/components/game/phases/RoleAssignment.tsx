@@ -2,15 +2,18 @@
  * RoleAssignment - 角色分配组件
  *
  * 说书人用于分配角色给玩家
- * 支持拖拽、随机分配、平衡分配
+ * 支持拖拽、随机分配、平衡分配、AI 建议
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shuffle, Sparkles, X, Check, Users } from 'lucide-react';
+import { Shuffle, Sparkles, X, Check, Users, Brain } from 'lucide-react';
 import { TROUBLE_BREWING_CHARACTERS, getStandardComposition } from '../../../data/characters/trouble-brewing';
 import { Team, type Character, type PlayerId } from '../../../types/game';
 import { useUIStore } from '../../../logic/stores/uiStore';
+import { useAIAssistant } from '../../../hooks/useAIAssistant';
+import { RoleSuggestionPanel } from '../ui/AISuggestionPanel';
+import type { RoleAssignmentSuggestion } from '../../../lib/ai-storyteller';
 
 interface RoleAssignmentProps {
     players: Array<{ id: PlayerId; name: string; characterId: string | null }>;
@@ -30,6 +33,28 @@ export function RoleAssignment({
     const { draggedCharacterId, setDraggedCharacter } = useUIStore();
     const [selectedTeam, setSelectedTeam] = useState<Team | 'all'>('all');
     const [hoveredPlayerId, setHoveredPlayerId] = useState<PlayerId | null>(null);
+
+    // AI 辅助
+    const { isEnabled: aiEnabled, isLoading: aiLoading, error: aiError, suggestRoles } = useAIAssistant();
+    const [aiSuggestion, setAiSuggestion] = useState<RoleAssignmentSuggestion | null>(null);
+
+    // 请求 AI 建议
+    const handleRequestAISuggestion = useCallback(async () => {
+        const playersForAI = players.map(p => ({ id: p.id, name: p.name }));
+        const suggestion = await suggestRoles(playersForAI);
+        if (suggestion) {
+            setAiSuggestion(suggestion);
+        }
+    }, [players, suggestRoles]);
+
+    // 应用 AI 建议
+    const handleApplyAISuggestion = useCallback(() => {
+        if (!aiSuggestion) return;
+
+        aiSuggestion.assignments.forEach(assignment => {
+            onAssignRole(assignment.playerId, assignment.characterId);
+        });
+    }, [aiSuggestion, onAssignRole]);
 
     // 按阵营分组角色
     const charactersByTeam = {
@@ -203,6 +228,31 @@ export function RoleAssignment({
                                 平衡分配
                             </button>
                         </div>
+
+                        {/* AI 建议面板 */}
+                        {aiEnabled && (
+                            <div className="px-6 py-3 border-b border-white/10">
+                                <RoleSuggestionPanel
+                                    suggestion={aiSuggestion}
+                                    isLoading={aiLoading}
+                                    error={aiError}
+                                    onRequestSuggestion={handleRequestAISuggestion}
+                                    onApplySuggestion={handleApplyAISuggestion}
+                                />
+                            </div>
+                        )}
+
+                        {/* AI 未启用时的提示 */}
+                        {!aiEnabled && (
+                            <div className="px-6 py-3 border-b border-white/10">
+                                <div className="flex items-center gap-2 p-3 bg-stone-800/50 rounded-lg">
+                                    <Brain className="w-4 h-4 text-stone-500" />
+                                    <span className="text-xs text-stone-500">
+                                        AI 辅助未启用，可在设置中开启
+                                    </span>
+                                </div>
+                            </div>
+                        )}
 
                         {/* 当前配置统计 */}
                         <div className="px-6 py-3 bg-stone-900/50 border-b border-white/10">

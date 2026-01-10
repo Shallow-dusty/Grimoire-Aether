@@ -1,6 +1,7 @@
 import { Group, Circle } from 'react-konva';
 import { PlayerToken } from '../tokens/PlayerToken';
 import type { GameParticipant } from '../../../types/database';
+import { getCharacterById } from '../../../data/characters/trouble-brewing';
 
 interface SeatingChartProps {
     participants: GameParticipant[];
@@ -79,8 +80,8 @@ export function SeatingChart({
                         isDead={player.is_dead}
                         isSelected={selectedPlayerId === player.id}
                         role={role}
-                        // TODO: 从数据库获取真实角色名
-                        characterName={player.character_id || undefined}
+                        // 获取角色的本地化名称
+                        characterName={player.character_id ? getCharacterById(player.character_id)?.name : undefined}
                         // 传递状态标记
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         statusFlags={player.status_flags as any}

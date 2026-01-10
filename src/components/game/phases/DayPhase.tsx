@@ -2,8 +2,10 @@
  * DayPhase - 白天阶段组件
  *
  * 管理白天的讨论、提名、投票流程
+ * 支持 AI 说书人节奏提示
  */
 
+import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, MessageCircle, Users, Vote } from 'lucide-react';
 import { type GameMachineState } from '../../../logic/machines/gameMachine';
@@ -11,6 +13,8 @@ import { type PlayerId } from '../../../types/game';
 import { NominationPanel } from '../ui/NominationPanel';
 import { VotingPanel } from '../ui/VotingPanel';
 import { ClockwiseVoting } from '../ui/ClockwiseVoting';
+import { PacingTipsPanel } from '../ui/AISuggestionPanel';
+import { useGamePacingTips } from '../../../hooks/useAIAssistant';
 
 interface DayPhaseProps {
     machineState: GameMachineState;
@@ -86,6 +90,27 @@ export function DayPhase({
 
     const alivePlayers = players.filter(p => !p.isDead);
     const deadPlayers = players.filter(p => p.isDead);
+
+    // AI 节奏提示
+    const gameStateForTips = useMemo(() => ({
+        players: players.map(p => ({
+            id: p.id,
+            name: p.name,
+            characterId: p.characterId,
+            isDead: p.isDead,
+            isGhost: p.isGhost,
+            seatIndex: 0, // 简化处理
+            status: { poisoned: false, drunk: false, protected: false, dead: p.isDead }
+        })),
+        currentDay,
+        currentNight: currentDay,
+        executedToday,
+        nominationHistory: nominatedToday.map(id => ({ nomineeId: id, passed: false }))
+    }), [players, currentDay, executedToday, nominatedToday]);
+
+    const { tips: pacingTips, isLoading: tipsLoading, refresh: refreshTips } = useGamePacingTips(
+        isStoryteller && isDiscussion ? gameStateForTips : null
+    );
 
     return (
         <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-xl px-4">
@@ -188,6 +213,15 @@ export function DayPhase({
                                 >
                                     结束白天
                                 </button>
+                            )}
+
+                            {/* AI 节奏提示 */}
+                            {isStoryteller && pacingTips.length > 0 && (
+                                <PacingTipsPanel
+                                    tips={pacingTips}
+                                    isLoading={tipsLoading}
+                                    onRefresh={refreshTips}
+                                />
                             )}
                         </motion.div>
                     )}

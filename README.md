@@ -59,6 +59,16 @@ npm install
 npm run dev
 ```
 
+### 启动完整开发环境（含 AI 后端）
+
+```bash
+# 终端 1: 启动前端
+npm run dev
+
+# 终端 2: 启动后端 (Cloudflare Pages Functions)
+npm run dev:wrangler
+```
+
 ### 构建生产版本
 
 ```bash
@@ -81,7 +91,7 @@ npm test -- --coverage
 
 ### 当前测试状态
 
-- **测试用例**：430+ 个
+- **测试用例**：513 个
 - **行覆盖率**：95%+
 - **测试框架**：Vitest + @testing-library/react
 
@@ -92,7 +102,8 @@ src/
 ├── components/
 │   ├── game/              # 游戏组件
 │   │   ├── phases/        # 阶段组件（设置、夜晚、白天、处决、结束）
-│   │   └── ui/            # 游戏 UI（投票面板、时针投票等）
+│   │   ├── board/         # 座位图组件
+│   │   └── ui/            # 游戏 UI（投票面板、AI建议面板等）
 │   └── ui/                # 通用 UI 组件
 │       └── layout/        # 布局组件
 ├── config/                # 配置文件
@@ -101,6 +112,10 @@ src/
 │   └── characters/        # 角色数据
 │       └── trouble-brewing.ts  # 暗流涌动剧本
 ├── hooks/                 # 自定义 Hooks
+│   └── useAIAssistant.ts  # AI 辅助 Hooks
+├── lib/                   # 库和客户端
+│   ├── ai-client.ts       # AI API 客户端
+│   └── ai-storyteller.ts  # AI 说书人助手
 ├── logic/                 # 纯逻辑层
 │   ├── game/              # 游戏结束判定
 │   ├── machines/          # XState 状态机
@@ -109,6 +124,7 @@ src/
 ├── test/                  # 集成测试
 ├── types/                 # TypeScript 类型定义
 └── utils/                 # 工具函数
+    └── statePersistence.ts # 游戏状态持久化
 ```
 
 ## 功能开关配置
@@ -127,6 +143,36 @@ src/
 | `ghostsCanSeeRoles` | 幽灵可见角色 | `false` |
 | `verboseHistory` | 详细日志 | `false` |
 | `realtimeSync` | 实时同步 (Supabase) | `false` |
+
+## AI 说书人辅助
+
+项目集成了 AI 说书人辅助功能，支持多个 AI 提供商：
+
+### 支持的 AI 提供商
+
+| 提供商 | 模型 | 特点 |
+|--------|------|------|
+| DeepSeek | V3.2, R1 | 国产优选，高性价比 |
+| Kimi | K2 Thinking | 256k 超长上下文 |
+| SiliconFlow | 多模型聚合 | 有免费额度 |
+| OpenRouter | Claude, GPT-4o | 国际多模型 |
+| OpenAI | GPT-4o, o1, o3-mini | 官方 API |
+| Anthropic | Claude Sonnet 4 | 高质量输出 |
+
+### AI 功能
+
+- **角色分配建议**：根据玩家人数自动生成平衡的角色分配方案
+- **游戏节奏提示**：白天阶段提供说书人决策建议
+- **能力结果生成**：帮助生成中毒/醉酒玩家的错误信息
+
+### 配置 API Key
+
+在 Cloudflare Pages 或本地 `.dev.vars` 文件中配置：
+
+```
+DEEPSEEK_API_KEY=your_key
+KIMI_API_KEY=your_key
+```
 
 ## 支持的角色
 
